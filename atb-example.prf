@@ -1,0 +1,162 @@
+## Example Profile for arch-time-backup atb.sh
+
+## Set source, destination folder path
+SOURCE="/"
+DESTINATION="/media/BackArch/atb-slim-backup"
+
+## Set ssh flags for SOURCE or DESTINATION.  Default: ""
+#SSH_FLAGS="-p22 -i ${HOME}/.ssh/id_rsa"
+
+## Set rsync flags to be used for backup, like atb.sh --rsync-set-flags.
+## Use atb.sh --rsync-get-flags to show the Default flags.
+## Some rsync flags:
+##   --one-file-system, avoid crossing filesystem boundaries,
+##                      prevent backing up any mount point in the hierarchy
+##   --compress, compress file data, when over SSH
+##   --info=help, show more FLAGS for --info=FLAGS
+RSYNC_FLAGS="-aAX --info=progress2 -D --numeric-ids --links --hard-links --itemize-changes --times --recursive --perms --owner --group --stats --human-readable"
+
+## Set the expiration strategy. Default: "1:1 30:7 365:30"
+#EXPIRATION_STRATEGY="1:1 30:7 365:30"
+
+## When out of space, automatically deleting backups or not. Default: "1"
+##   "0", off, the backup is aborted.
+##   "1", on, removing oldest backup and resuming backup.
+#AUTO_EXPIRE="1"
+
+## Set include/exclude file-rules by all content between FILTER_RULES_BEGIN
+## and FILTER_RULES_END, also including comments.
+## The FILTER_RULES are used with `rsync --filter`.
+## Be carefully with each rule(pattern) and their order, see more:
+##   1. https://github.com/laurent22/rsync-time-backup/issues/183
+##      https://github.com/laurent22/rsync-time-backup/issues/183#issuecomment-639091776
+##   2. https://stackoverflow.com/questions/35364075/using-rsync-filter-to-include-exclude-files
+##   3. https://wiki.archlinux.org/title/Rsync#Advanced_usage_of_filter_rules
+##   4. https://man.archlinux.org/man/rsync.1#FILTER_RULES_IN_DEPTH
+
+FILTER_RULES_BEGIN
+
+# ref: https://wiki.archlinux.org/title/Rsync#Full_system_backup
+- /dev/*
+- /proc/*
+- /sys/*
+- /tmp/*
+- /run/*
+- /mnt/*
+- /media/*
+- /lost+found/
+- lost+found/
+
+# under /boot
+- /boot/vmlinuz-*
+- /boot/initramfs-*.img
+- /boot/intel-ucode.img
+- /boot/EFI/APPLE/
+- /boot/archboot/*
+
+# under /etc
+- /etc/**.pacnew
++ /etc/
+
+# exclude opt, usr, (packages can be reinstalled)
+# only scripts in /usr/local/bin
+# be careful with `rsync --recursive`
+# ref: https://stackoverflow.com/questions/35364075/
+- /opt/*
++ /usr/
++ /usr/local/
++ /usr/local/bin/
+- /usr/local/*
++ /usr/bin/
+- /usr/bin/*
++ /usr/lib/
+- /usr/lib/*
+- /usr/*
+
+# under /root
+- /root/*
+
+# under /var, only pacman database
+# get installed packages list from backup data by
+#   pacman -Qqe -b DESTINATION/DATEXXX/var/lib/pacman/
++ /var/
++ /var/log/
++ /var/log/pacman.log
+- /var/log/*
++ /var/lib/
++ /var/lib/pacman/
++ /var/lib/pacman/local/
+- /var/lib/pacman/*
+- /var/lib/*
+- /var/*
+
+# under /home/USER, dotfiles
++ /home/
++ /home/*/
+
++ /home/*/.aria2/
++ /home/*/.filezilla/
++ /home/*/.Gdpy3/
++ /home/*/.gnupg/
+- /home/*/.goldendict/index/
++ /home/*/.goldendict/
++ /home/*/.icons/
++ /home/*/.ipython/
+- /home/*/.kodi/userdata/Thumbnails/*
++ /home/*/.kodi/
++ /home/*/.Mathematica/
++ /home/*/.matlab/
++ /home/*/.mlterm/
++ /home/*/.mozilla/
++ /home/*/.oh-my-zsh/
++ /home/*/.Osmos/
++ /home/*/.pip/
++ /home/*/.sogouinput/
++ /home/*/.ssh/
++ /home/*/.terminfo/
+- /home/*/.unison/*.log
++ /home/*/.unison/
++ /home/*/.vim/
+- /home/*/.Zotero-data/*.bak
++ /home/*/.zotero/
++ /home/*/.Zotero-data/
+
+# only deb files for easyconnect
++ /home/*/.ECDATA/
++ /home/*/.ECDATA/*.deb
+- /home/*/.ECDATA/*
+
+# only keep wallpaper, exclude others in .cache/
++ /home/*/.cache/
++ /home/*/.cache/wallpaper-360chrome/
++ /home/*/.cache/wallpaper-baidu/
++ /home/*/.cache/wallpaper-bing/
++ /home/*/.cache/wallpaper-lovebizhi/
++ /home/*/.cache/wallpaper-nationalgeographic/
++ /home/*/.cache/wallpaper-spotlight/
++ /home/*/.cache/wallpaper-wallhaven/
+- /home/*/.cache/*
+
+# exclude big size dirs, keep others in .config/
+- /home/*/.config/dinglive/
+- /home/*/.config/DingTalk/
+- /home/*/.config/GIMP/
+- /home/*/.config/google-chrome/
+- /home/*/.config/LiteLoaderQQNT/
+- /home/*/.config/LiteLoaderQQNT-NapCat/
+- /home/*/.config/QQ/
+- /home/*/.config/weixin/
++ /home/*/.config/
+
+# exclude big size dirs, keep others in .local/
+- /home/*/.local/share/wemeetapp/
+- /home/*/.local/matlab2014b/
+- /home/*/.local/share/zeitgeist/
+- /home/*/.local/share/Kingsoft/office6/data/backup/
+- /home/*/.local/share/QtProject/
++ /home/*/.local/
+
+- /home/*/*
+- /home/*
+
+FILTER_RULES_END
