@@ -1,3 +1,35 @@
+# Arch time backup
+
+Arch time backup script is a fork of [rsync-time-backup](https://github.com/laurent22/rsync-time-backup),
+renamed from `rsync_tmbackup.sh` to `atb.sh`,
+which is short for **A**ll **T**he **B**best with your **A**rch **T**ime **B**ackup.
+It is modified to support some new features and mainly used to back up my Arch Linux system files and personal data.
+
+## atb features
+
+* read backup profile (configfile), like [rtb-wrapper](https://github.com/thomas-mc-work/rtb-wrapper).
+  The profile contains all supported options and parameters of `atb.sh` (except `-c`, `--config`).
+  The options and parameters that come after `--config` will overwrite the settings in profile.
+  An example profile is here: `./atb-example.prf`.
+
+* remove SSH options: `--port` `--id_rsa`, add option `--ssh-set-flags` instead, just like setting flags for rsync.
+  Then we can skip SSH issues related with `-o StrictHostKeyChecking=`, etc.,
+  and configure SSH parameters more flexibly, such as using `-F configfile` to have a short flags.
+
+* remove parameter `[exclude-pattern-file]`, use `--rsync-set-flags` to set `--exclude-from`.
+  As rsync filter rules can be defined in backup profile, so it is recommended to use the profile to set exclude rules.
+  When using a profile, the filter rules will be written to a tmpfile first
+  and then taken by rsync option `--filter="merge a.tmpfile.of.rules"`.
+
+## atb usage
+
+TODO
+
+## other
+
+The original document of `rsync-time-backup` is [below](#Rsync time backup).
+The forked version of `rsync-time-backup` is `v1.1.5-41-g7af3df3`. (get by `git describe --long --tags`)
+
 # Rsync time backup
 
 This script offers Time Machine-style backup using rsync. It creates incremental backups of files and directories to the destination of your choice. The backups are structured in a way that makes it easy to recover any file at any point in time.
