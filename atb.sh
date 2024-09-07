@@ -6,14 +6,14 @@ APPNAME=$(basename "$0" | sed "s/\.sh$//")
 # Log functions
 # ---------------------------------------------------------------------------
 
-fn_log_info()  { echo "$APPNAME: $1"; }
-fn_log_warn()  { echo "$APPNAME: [WARNING] $1" 1>&2; }
-fn_log_error() { echo "$APPNAME: [ERROR] $1" 1>&2; }
+fn_log_info()  { echo "${APPNAME}: $1"; }
+fn_log_warn()  { echo "${APPNAME^^}: [WARNING] $1" 1>&2; }
+fn_log_error() { echo "${APPNAME^^}: [ERROR] $1" 1>&2; }
 fn_log_info_cmd()  {
     if [ -n "$SSH_DEST_FOLDER_PREFIX" ]; then
-        echo "$APPNAME: $SSH_CMD '$1'";
+        echo "${APPNAME^}: $SSH_CMD '$1'";
     else
-        echo "$APPNAME: $1";
+        echo "${APPNAME^}: $1";
     fi
 }
 
@@ -32,28 +32,30 @@ trap 'fn_terminate_script' SIGINT
 # Small utility functions for reducing code duplication
 # ---------------------------------------------------------------------------
 fn_display_usage() {
-    echo "Usage: $(basename "$0") [OPTION]... <[USER@HOST:]SOURCE> <[USER@HOST:]DESTINATION> [exclude-pattern-file]"
+    echo "Usage: $(basename "$0") [OPTION]... <[USER@HOST:]SOURCE> <[USER@HOST:]DESTINATION>"
     echo ""
     echo "Options"
-    echo " -p, --port             SSH port."
-    echo " -h, --help             Display this help message."
-    echo " -i, --id_rsa           Specify the private ssh key to use."
-    echo " --rsync-get-flags      Display the default rsync flags that are used for backup. If using remote"
-    echo "                        drive over SSH, --compress will be added."
-    echo " --rsync-set-flags      Set the rsync flags that are going to be used for backup."
+    echo " -p, --profile          Specify a backup profile."
+    echo " --ssh-get-flags        Display the default SSH flags that are used for backup."
+    echo " --ssh-set-flags        Set the SSH flags that are used for backup."
+    echo " --ssh-append-flags     Append the SSH flags that are going to be used for backup."
+    echo " --rsync-get-flags      Display the default rsync flags that are used for backup."
+    echo "                        If using remote drive over SSH, --compress will be added."
+    echo " --rsync-set-flags      Set the rsync flags that are used for backup."
     echo " --rsync-append-flags   Append the rsync flags that are going to be used for backup."
-    echo " --log-dir              Set the log file directory. If this flag is set, generated files will"
-    echo "                        not be managed by the script - in particular they will not be"
-    echo "                        automatically deleted."
-    echo "                        Default: $LOG_DIR"
     echo " --strategy             Set the expiration strategy. Default: \"1:1 30:7 365:30\" means after one"
     echo "                        day, keep one backup per day. After 30 days, keep one backup every 7 days."
     echo "                        After 365 days keep one backup every 30 days."
     echo " --no-auto-expire       Disable automatically deleting backups when out of space. Instead an error"
     echo "                        is logged, and the backup is aborted."
+    echo " --log-dir              Set the log file directory. If this flag is set, generated files will"
+    echo "                        not be managed by the script - in particular they will not be"
+    echo "                        automatically deleted."
+    echo "                        Default: $LOG_DIR"
+    echo " -h, --help             Display this help message."
     echo ""
     echo "For more detailed help, please see the README file:"
-    echo ""
+    echo "https://github.com/shmilee/arch-time-backup/blob/master/README.md"
     echo "https://github.com/laurent22/rsync-time-backup/blob/master/README.md"
 }
 
@@ -173,6 +175,34 @@ fn_expire_backups() {
     done
 }
 
+fn_parse_profile(){
+    local PRF="$1"
+    local fname="$(basename "${PRF}")"
+    local N0=$(awk '/FILTER_RULES_BEGIN/{print NR;exit}' "${PRF}")
+    local N1=$(awk '/^[ ]*FILTER_RULES_BEGIN[ ]*$/{print NR;exit}' "${PRF}")
+    local N2=$(awk '/^[ ]*FILTER_RULES_END[ ]*$/{print NR;exit}' "${PRF}")
+    if [ -z "$N0" ]; then
+        # No file-rules
+        source "${PRF}"
+    else
+        local profile_source="$(mktemp -u -t "${fname}.source.$$.XXXXX")"
+        awk -v n=$N0 '{if(NR<n){print $0}}' "${PRF}" >"${profile_source}"
+        source "${profile_source}"
+        rm -f -- "${profile_source}"
+        if [ -n "$N1" -a -n "$N2" ]; then
+            local filter="$(mktemp -u -t "${fname}.filter.$$.XXXXX")"
+            awk -v n1=$N1 -v n2=$N2 '{if((n1<NR)&&(NR<n2)){print $0}}' \
+                "${PRF}" >"${filter}"
+            FILTER_RULES="${filter}"
+            trap "rm -f -- '${filter}'" EXIT
+        fi
+    fi
+    SRC_FOLDER="${SOURCE}"
+    DEST_FOLDER="${DESTINATION}"
+    unset SOURCE DESTINATION
+    #SSH_FLAGS, RSYNC_FLAGS, EXPIRATION_STRATEGY, AUTO_EXPIRE
+}
+
 fn_parse_ssh() {
     # To keep compatibility with bash version < 3, we use grep
     if echo "$DEST_FOLDER"|grep -Eq '^[A-Za-z0-9\._%\+\-]+@[A-Za-z0-9.\-]+:.+$'
@@ -274,7 +304,7 @@ ID_RSA=""
 
 SRC_FOLDER=""
 DEST_FOLDER=""
-EXCLUSION_FILE=""
+FILTER_RULES=""
 LOG_DIR="$HOME/.$APPNAME"
 AUTO_DELETE_LOG="1"
 EXPIRATION_STRATEGY="1:1 30:7 365:30"
@@ -284,17 +314,13 @@ RSYNC_FLAGS="-D --numeric-ids --links --hard-links --one-file-system --itemize-c
 
 while :; do
     case $1 in
-        -h|-\?|--help)
+        -h|--help)
             fn_display_usage
             exit
             ;;
-        -p|--port)
+        -p|--profile)
             shift
-            SSH_PORT=$1
-            ;;
-        -i|--id_rsa)
-            shift
-            ID_RSA="$1"
+            fn_parse_profile "$1"
             ;;
         --rsync-get-flags)
             shift
@@ -313,19 +339,18 @@ while :; do
             shift
             EXPIRATION_STRATEGY="$1"
             ;;
+        --no-auto-expire)
+            AUTO_EXPIRE="0"
+            ;;
         --log-dir)
             shift
             LOG_DIR="$1"
             AUTO_DELETE_LOG="0"
             ;;
-        --no-auto-expire)
-            AUTO_EXPIRE="0"
-            ;;
         --)
             shift
-            SRC_FOLDER="$1"
-            DEST_FOLDER="$2"
-            EXCLUSION_FILE="$3"
+            SRC_FOLDER="${1:-$SRC_FOLDER}"
+            DEST_FOLDER="${2:-$DEST_FOLDER}"
             break
             ;;
         -*)
@@ -335,9 +360,8 @@ while :; do
             exit 1
             ;;
         *)
-            SRC_FOLDER="$1"
-            DEST_FOLDER="$2"
-            EXCLUSION_FILE="$3"
+            SRC_FOLDER="${1:-$SRC_FOLDER}"
+            DEST_FOLDER="${2:-$DEST_FOLDER}"
             break
     esac
 
@@ -349,6 +373,21 @@ if [[ -z "$SRC_FOLDER" || -z "$DEST_FOLDER" ]]; then
     fn_display_usage
     exit 1
 fi
+
+# Show info
+echo
+fn_log_info "Backup Information"
+cat <<EOF
+
+  SOURCE       = ${SRC_FOLDER}
+  DESTINATION  = ${DEST_FOLDER}
+  FILTER_RULES = ${FILTER_RULES}
+  SSH_FLAGS    = ${SSH_FLAGS}
+  RSYNC_FLAGS  = ${RSYNC_FLAGS}
+  AUTO_EXPIRE  = ${AUTO_EXPIRE}
+  EXPIRATION_STRATEGY  = ${EXPIRATION_STRATEGY}
+
+EOF
 
 # Strips off last slash from dest. Note that it means the root folder "/"
 # will be represented as an empty string "", which is fine
@@ -378,7 +417,7 @@ fi
 # Now strip off last slash from source folder.
 SRC_FOLDER="${SRC_FOLDER%/}"
 
-for ARG in "$SRC_FOLDER" "$DEST_FOLDER" "$EXCLUSION_FILE"; do
+for ARG in "$SRC_FOLDER" "$DEST_FOLDER"; do
     if [[ "$ARG" == *"'"* ]]; then
         fn_log_error 'Source and destination directories may not contain single quote characters.'
         exit 1
@@ -554,19 +593,22 @@ while : ; do
     fi
     CMD="$CMD $RSYNC_FLAGS"
     CMD="$CMD --log-file '$LOG_FILE'"
-    if [ -n "$EXCLUSION_FILE" ]; then
-        # We've already checked that $EXCLUSION_FILE doesn't contain a single quote
-        CMD="$CMD --exclude-from '$EXCLUSION_FILE'"
+    if [ -f "$FILTER_RULES" ]; then
+        CMD="$CMD --filter='merge $FILTER_RULES'"
     fi
     CMD="$CMD $LINK_DEST_OPTION"
     CMD="$CMD -- '$SSH_SRC_FOLDER_PREFIX$SRC_FOLDER/' '$SSH_DEST_FOLDER_PREFIX$DEST/'"
 
     fn_log_info "Running command:"
     fn_log_info "$CMD"
+    echo
 
     fn_run_cmd "echo $MYPID > $INPROGRESS_FILE"
     eval $CMD
     CMD_RETURNCODE=$?
+    if [ -f "$FILTER_RULES" ]; then
+        rm -f -- "$FILTER_RULES"
+    fi
 
     # -----------------------------------------------------------------------
     # Check if we ran out of space

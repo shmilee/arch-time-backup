@@ -14,7 +14,7 @@ DESTINATION="/media/BackArch/atb-slim-backup"
 ##                      prevent backing up any mount point in the hierarchy
 ##   --compress, compress file data, when over SSH
 ##   --info=help, show more FLAGS for --info=FLAGS
-RSYNC_FLAGS="-aAX --info=progress2 -D --numeric-ids --links --hard-links --itemize-changes --times --recursive --perms --owner --group --stats --human-readable"
+RSYNC_FLAGS="-aAX --info=progress -D --numeric-ids --links --hard-links --itemize-changes --times --recursive --perms --owner --group --stats --human-readable"
 
 ## Set the expiration strategy. Default: "1:1 30:7 365:30"
 #EXPIRATION_STRATEGY="1:1 30:7 365:30"
@@ -27,6 +27,9 @@ RSYNC_FLAGS="-aAX --info=progress2 -D --numeric-ids --links --hard-links --itemi
 ## Set include/exclude file-rules by all content between FILTER_RULES_BEGIN
 ## and FILTER_RULES_END, also including comments.
 ## The FILTER_RULES are used with `rsync --filter`.
+## Comment out the FILTER_RULES_BEGIN line or FILTER_RULES_END line can
+## disable the filter rules.
+##
 ## Be carefully with each rule(pattern) and their order, see more:
 ##   1. https://github.com/laurent22/rsync-time-backup/issues/183
 ##      https://github.com/laurent22/rsync-time-backup/issues/183#issuecomment-639091776

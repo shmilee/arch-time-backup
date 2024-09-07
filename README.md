@@ -8,8 +8,8 @@ It is modified to support some new features and mainly used to back up my Arch L
 ## ATB features
 
 * read backup profile (configfile), like [rtb-wrapper](https://github.com/thomas-mc-work/rtb-wrapper).
-  The profile contains all supported options and parameters of `atb.sh` (except `-c`, `--config`).
-  The options and parameters that come after `--config` will overwrite the settings in profile.
+  The profile contains most options and parameters of `atb.sh`, except `-p`, `--profile` and `--log-dir`.
+  The options and parameters that come after `--profile` will overwrite the settings in profile.
   An example profile is here: `./atb-example.prf`.
 
 * remove SSH options: `--port` `--id_rsa`, add option `--ssh-set-flags` instead, just like setting flags for rsync.
