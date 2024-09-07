@@ -175,7 +175,7 @@ fn_expire_backups() {
 
 fn_parse_ssh() {
 	# To keep compatibility with bash version < 3, we use grep
-	if echo "$DEST_FOLDER"|grep -Eq '^[A-Za-z0-9\._%\+\-]+@[A-Za-z0-9.\-]+\:.+$'
+	if echo "$DEST_FOLDER"|grep -Eq '^[A-Za-z0-9\._%\+\-]+@[A-Za-z0-9.\-]+:.+$'
 	then
 		SSH_USER=$(echo "$DEST_FOLDER" | sed -E  's/^([A-Za-z0-9\._%\+\-]+)@([A-Za-z0-9.\-]+)\:(.+)$/\1/')
 		SSH_HOST=$(echo "$DEST_FOLDER" | sed -E  's/^([A-Za-z0-9\._%\+\-]+)@([A-Za-z0-9.\-]+)\:(.+)$/\2/')
@@ -186,7 +186,7 @@ fn_parse_ssh() {
 			SSH_CMD="ssh -p $SSH_PORT ${SSH_USER}@${SSH_HOST}"
 		fi
 		SSH_DEST_FOLDER_PREFIX="${SSH_USER}@${SSH_HOST}:"
-	elif echo "$SRC_FOLDER"|grep -Eq '^[A-Za-z0-9\._%\+\-]+@[A-Za-z0-9.\-]+\:.+$'
+	elif echo "$SRC_FOLDER"|grep -Eq '^[A-Za-z0-9\._%\+\-]+@[A-Za-z0-9.\-]+:.+$'
 	then
 		SSH_USER=$(echo "$SRC_FOLDER" | sed -E  's/^([A-Za-z0-9\._%\+\-]+)@([A-Za-z0-9.\-]+)\:(.+)$/\1/')
 		SSH_HOST=$(echo "$SRC_FOLDER" | sed -E  's/^([A-Za-z0-9\._%\+\-]+)@([A-Za-z0-9.\-]+)\:(.+)$/\2/')
@@ -252,11 +252,11 @@ fn_test_file_exists_src() {
 }
 
 fn_df_t_src() {
-	fn_run_cmd_src "df -T '${1}'"
+	fn_run_cmd_src "df -T '${1}/'"
 }
 
 fn_df_t() {
-	fn_run_cmd "df -T '${1}'"
+	fn_run_cmd "df -T '${1}/'"
 }
 
 # -----------------------------------------------------------------------------
