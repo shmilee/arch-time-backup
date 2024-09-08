@@ -40,7 +40,66 @@ It is modified to support some new features and mainly used to back up my Arch L
 
 ## ATB usage
 
-TODO
+```
+Usage: atb.sh [OPTION]... <[USER@HOST:]SOURCE> <[USER@HOST:]DESTINATION>
+
+Options
+ -c, --color <on|off>   Colorize the log info warn error output in a tty.
+ -p, --profile          Specify a backup profile. The profile can be used to set
+                        SOURCE, DESTINATION, the binary of ssh and rsync,
+                        the flags of ssh and rsync, expiration strategy,
+                        auto-expire and filter rules for backup files.
+ --ssh-get-flags        Display the default SSH flags that are used for backup.
+ --ssh-set-flags        Set the SSH flags that are used for backup.
+ --ssh-append-flags     Append the SSH flags that are going to be used for backup.
+ --rsync-get-flags      Display the default rsync flags that are used for backup.
+                        If using remote drive over SSH, --compress will be added.
+ --rsync-set-flags      Set the rsync flags that are used for backup.
+ --rsync-append-flags   Append the rsync flags that are going to be used for backup.
+ --strategy             Set the expiration strategy. Default: "1:1 30:7 365:30" means after one
+                        day, keep one backup per day. After 30 days, keep one backup every 7 days.
+                        After 365 days keep one backup every 30 days.
+ --no-auto-expire       Disable automatically deleting backups when out of space. Instead an error
+                        is logged, and the backup is aborted.
+ --log-dir              Set the log file directory. If this flag is set, generated files will
+                        not be managed by the script - in particular they will not be
+                        automatically deleted.
+                        Default: /home/shmilee/.atb
+ -h, --help             Display this help message.
+```
+
+* Backup with profile `atb-example.prf`
+
+```
+[$] atb.sh -p path/to/atb-example.prf
+```
+
+* Backup with profile, set new SOURCE=/home and DESTINATION=/mnt/backupdrive
+
+```
+[$] atb.sh -p path/to/atb-example.prf /home /mnt/backup_drive
+```
+
+* Backup to remote drive over SSH, like to a backup server (even through a proxy server)
+
+```
+[$] cat .ssh/config
+Host    proxy.vps
+    HostName proxy_vps_ip
+    User proxy_user
+    IdentityFile ~/.ssh/id_rsa_proxy
+
+Host    backup.vps
+    HostName example.com
+    Port     2222
+    User     user
+    Protocol 2
+    IdentityFile ~/.ssh/id_rsa
+    ServerAliveInterval 60
+    #ProxyCommand ssh -W %h:%p proxy.vps
+
+[$] atb.sh /home user@backup.vps:/mnt/backup_drive
+```
 
 ## other
 
