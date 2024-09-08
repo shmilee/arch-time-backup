@@ -59,6 +59,7 @@ Options
  --ssh-append-flags    Append the SSH flags that are going to be used for backup.
  --rsync-get-flags     Display the default rsync flags that are used for backup and exit.
                        If using remote drive over SSH, --compress will be added.
+                       If SOURCE or DESTINATION is on FAT, --modify-window=2 will be added.
  --rsync-set-flags     Set the rsync flags that are used for backup.
  --rsync-append-flags  Append the rsync flags that are going to be used for backup.
  --strategy            Set the expiration strategy. Default: "1:1 30:7 365:30" means after one
@@ -72,10 +73,17 @@ Options
                        Default: /home/shmilee/.atb
  -c, --color <on|off>  Colorize the log info warn error output in a tty.
  --init <DESTINATION>  Initialize <DESTINATION> by creating a backup marker file and exit.
- -t, --time </path/to/aspecific/file> [LINKS_DIR]
+ -t, --time </path/to/a/specific/file> [LINKS_DIR]
                        List all versions of a specific file in a backup DESTINATION and exit.
                        Optional LINKS_DIR is used to create new links for each unique file.
  -h, --help            Display this help message and exit.
+```
+
+* Initialize DESTINATION
+
+```
+[$] atb.sh --init /mnt/backupdrive
+[$] atb.sh --init user@backup.vps:/mnt/backup_drive
 ```
 
 * Backup with profile `atb-example.prf`

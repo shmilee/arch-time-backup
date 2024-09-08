@@ -68,6 +68,7 @@ fn_display_usage() {
     echo " --ssh-append-flags    Append the SSH flags that are going to be used for backup."
     echo " --rsync-get-flags     Display the default rsync flags that are used for backup and exit."
     echo "                       If using remote drive over SSH, --compress will be added."
+    echo "                       If SOURCE or DESTINATION is on FAT, --modify-window=2 will be added."
     echo " --rsync-set-flags     Set the rsync flags that are used for backup."
     echo " --rsync-append-flags  Append the rsync flags that are going to be used for backup."
     echo " --strategy            Set the expiration strategy. Default: \"1:1 30:7 365:30\" means after one"
@@ -81,7 +82,7 @@ fn_display_usage() {
     echo "                       Default: $LOG_DIR"
     echo " -c, --color <on|off>  Colorize the log info warn error output in a tty."
     echo " --init <DESTINATION>  Initialize <DESTINATION> by creating a backup marker file and exit."
-    echo " -t, --time </path/to/aspecific/file> [LINKS_DIR]"
+    echo " -t, --time </path/to/a/specific/file> [LINKS_DIR]"
     echo "                       List all versions of a specific file in a backup DESTINATION and exit."
     echo "                       Optional LINKS_DIR is used to create new links for each unique file."
     echo " -h, --help            Display this help message and exit."
@@ -246,14 +247,8 @@ fn_parse_ssh() {
 }
 
 fn_check_BIN() {
-    if [ -n "$SSH_CMD" ]; then
-        if ! hash "$SSH_BIN" &>/dev/null; then
-            fn_log_error "Command not found: '$SSH_BIN'!"
-            exit 3
-        fi
-    fi
-    if ! hash "$RSYNC_BIN" &>/dev/null; then
-        fn_log_error "Command not found: '$RSYNC_BIN'!"
+    if ! hash "$1" &>/dev/null; then
+        fn_log_error "Command not found: '$1'!"
         exit 3
     fi
 }
@@ -284,6 +279,36 @@ fn_ln() { fn_run_cmd "ln -s -- '$1' '$2'"; }
 fn_test_file_exists_src() { fn_run_cmd_src "test -e '$1'"; }
 fn_df_t_src() { fn_run_cmd_src "df -T '${1}/'"; }
 fn_df_t() { fn_run_cmd "df -T '${1}/'"; }
+fn_backup_marker_path() { echo "$1/backup.marker"; }
+fn_find_backup_marker() { fn_find "$(fn_backup_marker_path "$1")" 2>/dev/null; }
+
+fn_initialize_dest() {
+    DEST_FOLDER="${1%/}"
+    fn_parse_ssh
+    if [ -n "$SSH_DEST_FOLDER" ]; then  # remote DEST
+        fn_check_BIN "$SSH_BIN"
+        DEST_FOLDER="$SSH_DEST_FOLDER"
+    fi
+    local Marker="$(fn_find_backup_marker "$DEST_FOLDER")"
+    if [ -z "$Marker" ]; then
+        local marker_path="$(fn_backup_marker_path "$DEST_FOLDER")"
+        fn_log_info "Running commands:"
+        fn_log_info_cmd "mkdir -p -- '$DEST_FOLDER'"
+        fn_mkdir "$DEST_FOLDER"
+        fn_log_info_cmd "touch -- '$marker_path'"
+        fn_touch "$marker_path"
+        exit
+    else
+        fn_log_info "A backup marker is found in '$1'!"
+        fn_log_warn "The backup DESTINATION folder has been initialized!"
+        exit 1
+    fi
+}
+
+fn_time_travel() {
+    #TODO
+    fn_log_error "not implemented!"
+}
 
 # ---------------------------------------------------------------------------
 # Source and destination information
@@ -423,7 +448,10 @@ EOF
 DEST_FOLDER="${DEST_FOLDER%/}"
 
 fn_parse_ssh
-fn_check_BIN
+if [ -n "$SSH_CMD" ]; then
+    fn_check_BIN "$SSH_BIN"
+fi
+fn_check_BIN "$RSYNC_BIN"
 
 if [ -n "$SSH_DEST_FOLDER" ]; then
     DEST_FOLDER="$SSH_DEST_FOLDER"
@@ -453,10 +481,6 @@ done
 # Check that the destination drive is a backup drive
 # ---------------------------------------------------------------------------
 # TODO: check that the destination supports hard links
-
-fn_backup_marker_path() { echo "$1/backup.marker"; }
-fn_find_backup_marker() { fn_find "$(fn_backup_marker_path "$1")" 2>/dev/null; }
-
 if [ -z "$(fn_find_backup_marker "$DEST_FOLDER")" ]; then
     fn_log_info "Safety check failed - the destination does not appear to be a backup folder or drive (marker file not found)."
     fn_log_info "If it is indeed a backup folder, you may add the marker file by running the following command:"
