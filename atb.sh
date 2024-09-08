@@ -39,9 +39,9 @@ fn_log_error() {
 }
 fn_log_info_cmd() {
     if [ -n "$SSH_DEST_FOLDER_PREFIX" ]; then
-        echo "${BLUE}[${APPNAME^}]${COFF} ${BOLD}$SSH_CMD '$1'${COFF}"
+        echo -e "${BLUE}[${APPNAME^}]${COFF} ${BOLD}$SSH_CMD '$1'${COFF}"
     else
-        echo "${BLUE}[${APPNAME^}]${COFF} ${BOLD}$1${COFF}"
+        echo -e "${BLUE}[${APPNAME^}]${COFF} ${BOLD}$1${COFF}"
     fi
 }
 
@@ -200,16 +200,20 @@ fn_parse_profile() {
         source "${PRF}"
     else
         local profile_source="$(mktemp -u -t "${fname}.source.$$.XXXXX")"
-        awk -v n=$N0 '{if(NR<n){print $0}}' "${PRF}" >"${profile_source}"
-        source "${profile_source}"
-        rm -f -- "${profile_source}"
         if [ -n "$N1" -a -n "$N2" ]; then
+            awk -v n1=$N1 -v n2=$N2 '{if((NR<n1)||(NR>n2)){print $0}}' \
+                "${PRF}" >"${profile_source}"
+            # filter part
             local filter="$(mktemp -u -t "${fname}.filter.$$.XXXXX")"
             awk -v n1=$N1 -v n2=$N2 '{if((n1<NR)&&(NR<n2)){print $0}}' \
                 "${PRF}" >"${filter}"
             FILTER_RULES="${filter}"
             trap "rm -f -- '${filter}'" EXIT
+        else
+            awk -v n=$N0 '{if(NR<n){print $0}}' "${PRF}" >"${profile_source}"
         fi
+        source "${profile_source}"
+        rm -f -- "${profile_source}"
     fi
     SRC_FOLDER="${SOURCE}"
     DEST_FOLDER="${DESTINATION}"
