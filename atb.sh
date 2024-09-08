@@ -188,7 +188,9 @@ fn_parse_profile(){
     SRC_FOLDER="${SOURCE}"
     DEST_FOLDER="${DESTINATION}"
     unset SOURCE DESTINATION
-    #SSH_FLAGS, RSYNC_FLAGS, EXPIRATION_STRATEGY, AUTO_EXPIRE
+    #SSH_BIN, RSYNC_BIN
+    #SSH_FLAGS, RSYNC_FLAGS,
+    #EXPIRATION_STRATEGY, AUTO_EXPIRE
 }
 
 fn_parse_ssh() {
@@ -528,6 +530,12 @@ while : ; do
     # -----------------------------------------------------------------------
     # Start backup
     # -----------------------------------------------------------------------
+    # Create destination folder if it doesn't already exists
+    if [ -z "$(fn_find "$DEST -type d" 2>/dev/null)" ]; then
+        fn_log_info "Creating destination $SSH_DEST_FOLDER_PREFIX$DEST"
+        fn_mkdir "$DEST" || exit $?
+    fi
+
     LOG_FILE="$LOG_DIR/$(date +"%Y-%m-%d-%H%M%S").log"
     CMD="$RSYNC_BIN $RSYNC_FLAGS --log-file '$LOG_FILE'"
     if [ -n "$SSH_CMD" ]; then
@@ -545,12 +553,6 @@ while : ; do
     fn_log_info "Running command:"
     fn_log_info "  $CMD"
     echo
-
-    # Create destination folder if it doesn't already exists
-    if [ -z "$(fn_find "$DEST -type d" 2>/dev/null)" ]; then
-        fn_log_info "Creating destination $SSH_DEST_FOLDER_PREFIX$DEST"
-        fn_mkdir "$DEST" || exit $?
-    fi
 
     fn_run_cmd "echo $MYPID > $INPROGRESS_FILE"
     eval $CMD
