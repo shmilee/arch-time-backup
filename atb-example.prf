@@ -4,17 +4,24 @@
 SOURCE="/"
 DESTINATION="/media/BackArch/atb-slim-backup"
 
-## Set ssh flags for SOURCE or DESTINATION.  Default: ""
+## Set SSH Rsync command binary. Default: ssh, rsync
+#SSH_BIN="ssh"
+#RSYNC_BIN="rsync"
+
+## Set ssh flags for SOURCE or DESTINATION, like atb.sh --ssh-set-flags.
+## Default: Use atb.sh --ssh-get-flags to show the Default flags.
 #SSH_FLAGS="-p22 -i ${HOME}/.ssh/id_rsa"
+#SSH_FLAGS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
 
 ## Set rsync flags to be used for backup, like atb.sh --rsync-set-flags.
-## Use atb.sh --rsync-get-flags to show the Default flags.
+## Default: Use atb.sh --rsync-get-flags to show the Default flags.
 ## Some rsync flags:
 ##   --one-file-system, avoid crossing filesystem boundaries,
 ##                      prevent backing up any mount point in the hierarchy
 ##   --compress, compress file data, when over SSH
 ##   --info=help, show more FLAGS for --info=FLAGS
-RSYNC_FLAGS="-aAX --info=progress -D --numeric-ids --links --hard-links --itemize-changes --times --recursive --perms --owner --group --stats --human-readable"
+RSYNC_FLAGS="-D --numeric-ids --links --hard-links --itemize-changes --times --recursive --perms --owner --group --stats --human-readable"
+RSYNC_FLAGS="-aAX --info=progress ${RSYNC_FLAGS}"
 
 ## Set the expiration strategy. Default: "1:1 30:7 365:30"
 #EXPIRATION_STRATEGY="1:1 30:7 365:30"
