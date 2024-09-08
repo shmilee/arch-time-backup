@@ -7,6 +7,9 @@ It is modified to support some new features and mainly used to back up my Arch L
 
 ## ATB features
 
+* Add colors for log info warn error when outputting onto a tty.
+  Option `-c, --color <on|off>` is used to set this. Default: 'on'.
+
 * Support to read a backup profile (configfile), like [rtb-wrapper](https://github.com/thomas-mc-work/rtb-wrapper).
   The profile contains most options and parameters of `atb.sh`, except `-p`, `--profile` and `--log-dir`, etc.
   It is used to set,

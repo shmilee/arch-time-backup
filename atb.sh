@@ -2,21 +2,46 @@
 # Copyright (c) 2024 shmilee
 # Copyright (c) 2013-2024 Laurent Cozic (laurent22)
 # License: MIT
-#
 
 APPNAME=$(basename "$0" | sed "s/\.sh$//")
 
 # ---------------------------------------------------------------------------
 # Log functions
 # ---------------------------------------------------------------------------
-fn_log_info()  { echo "[${APPNAME}] $1"; }
-fn_log_warn()  { echo "[${APPNAME^^}] WARNING $1" 1>&2; }
-fn_log_error() { echo "[${APPNAME^^}] ERROR $1" 1>&2; }
-fn_log_info_cmd()  {
-    if [ -n "$SSH_DEST_FOLDER_PREFIX" ]; then
-        echo "[${APPNAME^}] $SSH_CMD '$1'";
+fn_set_color() {
+    local usecolor="$1"  # on, off
+    # https://unix.stackexchange.com/questions/401934
+    if [ "$usecolor" != "off" -a -t 1 -a -t 2 ]; then
+        COFF="\e[1;0m"
+        BOLD="\e[1;1m"
+        BLUE="${BOLD}\e[1;34m"
+        GREEN="${BOLD}\e[1;32m"
+        YELLOW="${BOLD}\e[1;33m"
+        RED="${BOLD}\e[1;31m"
     else
-        echo "[${APPNAME^}] $1";
+        COFF=""
+        BOLD=""
+        BLUE=""
+        GREEN=""
+        YELLOW=""
+        RED=""
+    fi
+    #readonly COFF BOLD BLUE GREEN YELLOW RED
+}
+fn_set_color  # default on
+fn_log_info() { echo -e "${BLUE}[${APPNAME}]${COFF} $1"; }
+fn_log_info_gb() { echo -e "${GREEN}[${APPNAME}]${COFF} ${BOLD}$1${COFF}"; }
+fn_log_warn() {
+    echo -e "${YELLOW}[${APPNAME^^}]${COFF} ${BOLD}WARNING $1${COFF}" 1>&2
+}
+fn_log_error() {
+    echo -e "${RED}[${APPNAME^^}]${COFF} ${BOLD}ERROR $1${COFF}" 1>&2
+}
+fn_log_info_cmd() {
+    if [ -n "$SSH_DEST_FOLDER_PREFIX" ]; then
+        echo "${BLUE}[${APPNAME^}]${COFF} ${BOLD}$SSH_CMD '$1'${COFF}"
+    else
+        echo "${BLUE}[${APPNAME^}]${COFF} ${BOLD}$1${COFF}"
     fi
 }
 
@@ -33,6 +58,7 @@ fn_display_usage() {
     echo "Usage: $(basename "$0") [OPTION]... <[USER@HOST:]SOURCE> <[USER@HOST:]DESTINATION>"
     echo ""
     echo "Options"
+    echo " -c, --color <on|off>   Colorize the log info warn error output in a tty."
     echo " -p, --profile          Specify a backup profile. The profile can be used to set"
     echo "                        SOURCE, DESTINATION, the binary of ssh and rsync,"
     echo "                        the flags of ssh and rsync, expiration strategy,"
@@ -159,7 +185,7 @@ fn_expire_backups() {
     done
 }
 
-fn_parse_profile(){
+fn_parse_profile() {
     local PRF="$1"
     if [ ! -f "${PRF}" ]; then
         fn_log_error "Profile not found: '${PRF}'!"
@@ -279,6 +305,10 @@ while :; do
         -h|--help)
             fn_display_usage
             exit
+            ;;
+        -c|--color)
+            shift
+            fn_set_color "$1"
             ;;
         -p|--profile)
             shift
@@ -591,7 +621,7 @@ while : ; do
     elif [ -n "$(grep "rsync:" "$LOG_FILE")" ]; then
         fn_log_warn "Rsync reported a warning, backup failed."
     else
-        fn_log_info "Backup completed without errors."
+        fn_log_info_gb "Backup completed without errors."
         EXIT_CODE="0"
     fi
     if [ "$EXIT_CODE" = 0 ]; then
