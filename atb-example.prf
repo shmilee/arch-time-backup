@@ -1,6 +1,8 @@
 ## Example Profile for arch-time-backup atb.sh
 
 ## Set source, destination folder path
+## If this profile is in the SOURCE folder, the SOURCE can be set as
+##     SOURCE="$(dirname $(realpath $1))"
 SOURCE="/"
 DESTINATION="/media/BackArch/atb-slim-backup"
 

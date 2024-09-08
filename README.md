@@ -7,18 +7,29 @@ It is modified to support some new features and mainly used to back up my Arch L
 
 ## ATB features
 
-* read backup profile (configfile), like [rtb-wrapper](https://github.com/thomas-mc-work/rtb-wrapper).
-  The profile contains most options and parameters of `atb.sh`, except `-p`, `--profile` and `--log-dir`.
+* Support to read a backup profile (configfile), like [rtb-wrapper](https://github.com/thomas-mc-work/rtb-wrapper).
+  The profile contains most options and parameters of `atb.sh`, except `-p`, `--profile` and `--log-dir`, etc.
+  It is used to set,
+    + SOURCE of backup
+    + DESTINATION of backup
+    + (optional) the binary of ssh and rsync
+    + (optional) the flags of ssh and rsync
+    + (optional) expiration strategy
+    + (optional) when out of space, auto-delete any expired backups or not
+    + (optional) filter rules for backup files
   The options and parameters that come after `--profile` will overwrite the settings in profile.
   An example profile is here: `./atb-example.prf`.
 
-* remove SSH options: `--port` `--id_rsa`, add option `--ssh-set-flags` instead, just like setting flags for rsync.
-  Then we can skip SSH issues related with `-o StrictHostKeyChecking=`, etc.,
-  and configure SSH parameters more flexibly, such as using `-F configfile` to have short flags.
+* Use option `--ssh-set-flags` instead of `--port` `--id_rsa`, just like setting flags for rsync.
+  Then we can configure SSH parameters(flags) more flexibly. For example,
+    + use `-F configfile` to have short flags
+    + specify SSH flags without `StrictHostKeyChecking` `UserKnownHostsFile` to skip SSH [potential security issue](https://github.com/laurent22/rsync-time-backup/pull/128). [see more discussions](https://github.com/laurent22/rsync-time-backup/issues/104).
 
-* remove parameter `[exclude-pattern-file]`, use `--rsync-set-flags` to set `--exclude-from`.
-  As rsync filter rules can be defined in backup profile, so it is recommended to use the profile to set exclude rules.
-  When using a profile, the filter rules will be written to a tmpfile first
+* Remove parameter `[exclude-pattern-file]`.
+  If you want to set this, you can use `--rsync-set-flags` to set option `--exclude-from`.
+  However, a more recommended way to do this is to use the profile to set exclude rules,
+  as 1) rsync filter rules provide a more powerful and flexible mechanism 2) and they can be defined in a backup profile.
+  When using a profile, the filter rules will be written to a temporary file first
   and then taken by rsync option `--filter="merge a.tmpfile.of.rules"`.
 
 ## ATB usage
