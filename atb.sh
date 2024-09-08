@@ -32,10 +32,10 @@ fn_set_color  # default on
 fn_log_info() { echo -e "${BLUE}[${APPNAME}]${COFF} $1"; }
 fn_log_info_gb() { echo -e "${GREEN}[${APPNAME}]${COFF} ${BOLD}$1${COFF}"; }
 fn_log_warn() {
-    echo -e "${YELLOW}[${APPNAME^^}]${COFF} ${BOLD}WARNING $1${COFF}" 1>&2
+    echo -e "${YELLOW}[${APPNAME^^}]${COFF} ${BOLD}WARNING: $1${COFF}" 1>&2
 }
 fn_log_error() {
-    echo -e "${RED}[${APPNAME^^}]${COFF} ${BOLD}ERROR $1${COFF}" 1>&2
+    echo -e "${RED}[${APPNAME^^}]${COFF} ${BOLD}ERROR: $1${COFF}" 1>&2
 }
 fn_log_info_cmd() {
     if [ -n "$SSH_DEST_FOLDER_PREFIX" ]; then
@@ -58,28 +58,33 @@ fn_display_usage() {
     echo "Usage: $(basename "$0") [OPTION]... <[USER@HOST:]SOURCE> <[USER@HOST:]DESTINATION>"
     echo ""
     echo "Options"
-    echo " -c, --color <on|off>   Colorize the log info warn error output in a tty."
-    echo " -p, --profile          Specify a backup profile. The profile can be used to set"
-    echo "                        SOURCE, DESTINATION, the binary of ssh and rsync,"
-    echo "                        the flags of ssh and rsync, expiration strategy,"
-    echo "                        auto-expire and filter rules for backup files."
-    echo " --ssh-get-flags        Display the default SSH flags that are used for backup."
-    echo " --ssh-set-flags        Set the SSH flags that are used for backup."
-    echo " --ssh-append-flags     Append the SSH flags that are going to be used for backup."
-    echo " --rsync-get-flags      Display the default rsync flags that are used for backup."
-    echo "                        If using remote drive over SSH, --compress will be added."
-    echo " --rsync-set-flags      Set the rsync flags that are used for backup."
-    echo " --rsync-append-flags   Append the rsync flags that are going to be used for backup."
-    echo " --strategy             Set the expiration strategy. Default: \"1:1 30:7 365:30\" means after one"
-    echo "                        day, keep one backup per day. After 30 days, keep one backup every 7 days."
-    echo "                        After 365 days keep one backup every 30 days."
-    echo " --no-auto-expire       Disable automatically deleting backups when out of space. Instead an error"
-    echo "                        is logged, and the backup is aborted."
-    echo " --log-dir              Set the log file directory. If this flag is set, generated files will"
-    echo "                        not be managed by the script - in particular they will not be"
-    echo "                        automatically deleted."
-    echo "                        Default: $LOG_DIR"
-    echo " -h, --help             Display this help message."
+    echo " -p, --profile </path/to/profile>"
+    echo "                       Specify a backup profile. The profile can be used to set"
+    echo "                       SOURCE, DESTINATION, the binary of ssh and rsync,"
+    echo "                       the flags of ssh and rsync, expiration strategy,"
+    echo "                       auto-expire and filter rules for backup files."
+    echo " --ssh-get-flags       Display the default SSH flags that are used for backup and exit."
+    echo " --ssh-set-flags       Set the SSH flags that are used for backup."
+    echo " --ssh-append-flags    Append the SSH flags that are going to be used for backup."
+    echo " --rsync-get-flags     Display the default rsync flags that are used for backup and exit."
+    echo "                       If using remote drive over SSH, --compress will be added."
+    echo " --rsync-set-flags     Set the rsync flags that are used for backup."
+    echo " --rsync-append-flags  Append the rsync flags that are going to be used for backup."
+    echo " --strategy            Set the expiration strategy. Default: \"1:1 30:7 365:30\" means after one"
+    echo "                       day, keep one backup per day. After 30 days, keep one backup every 7 days."
+    echo "                       After 365 days keep one backup every 30 days."
+    echo " --no-auto-expire      Disable automatically deleting backups when out of space. Instead an error"
+    echo "                       is logged, and the backup is aborted."
+    echo " --log-dir </path>     Set the log file directory. If this flag is set, generated files will"
+    echo "                       not be managed by the script - in particular they will not be"
+    echo "                       automatically deleted."
+    echo "                       Default: $LOG_DIR"
+    echo " -c, --color <on|off>  Colorize the log info warn error output in a tty."
+    echo " --init <DESTINATION>  Initialize <DESTINATION> by creating a backup marker file and exit."
+    echo " -t, --time </path/to/aspecific/file> [LINKS_DIR]"
+    echo "                       List all versions of a specific file in a backup DESTINATION and exit."
+    echo "                       Optional LINKS_DIR is used to create new links for each unique file."
+    echo " -h, --help            Display this help message and exit."
     echo ""
     echo "For more detailed help, please see the README file:"
     echo "https://github.com/shmilee/arch-time-backup/blob/master/README.md"
@@ -310,10 +315,6 @@ while :; do
             fn_display_usage
             exit
             ;;
-        -c|--color)
-            shift
-            fn_set_color "$1"
-            ;;
         -p|--profile)
             shift
             fn_parse_profile "$1"
@@ -355,6 +356,20 @@ while :; do
             shift
             LOG_DIR="$1"
             AUTO_DELETE_LOG="0"
+            ;;
+        -c|--color)
+            shift
+            fn_set_color "$1"
+            ;;
+        --init)
+            shift
+            fn_initialize_dest "$1"
+            exit
+            ;;
+        -t|--time)
+            shift
+            fn_time_travel "$1" "$2"
+            exit
             ;;
         --)
             shift
@@ -567,7 +582,10 @@ while : ; do
     # Create destination folder if it doesn't already exists
     if [ -z "$(fn_find "$DEST -type d" 2>/dev/null)" ]; then
         fn_log_info "Creating destination $SSH_DEST_FOLDER_PREFIX$DEST"
-        fn_mkdir "$DEST" || exit $?
+        if ! fn_mkdir "$DEST"; then
+            fn_log_error "Failed to create destination!"
+            exit 4
+        fi
     fi
 
     LOG_FILE="$LOG_DIR/$(date +"%Y-%m-%d-%H%M%S").log"

@@ -7,14 +7,11 @@ It is modified to support some new features and mainly used to back up my Arch L
 
 ## ATB features
 
-* Add colors for log info warn error when outputting onto a tty.
-  Option `-c, --color <on|off>` is used to set this. Default: 'on'.
-
 * Support to read a backup profile (configfile), like [rtb-wrapper](https://github.com/thomas-mc-work/rtb-wrapper).
   The profile contains most options and parameters of `atb.sh`, except `-p`, `--profile` and `--log-dir`, etc.
   It is used to set,
-    + SOURCE of backup
-    + DESTINATION of backup
+    + `SOURCE` of backup
+    + `DESTINATION` of backup
     + (optional) the binary of ssh and rsync
     + (optional) the flags of ssh and rsync
     + (optional) expiration strategy
@@ -38,34 +35,47 @@ It is modified to support some new features and mainly used to back up my Arch L
   When using a profile, the filter rules will be written to a temporary file first
   and then taken by rsync option `--filter="merge a.tmpfile.of.rules"`.
 
+* Add option `-c, --color <on|off>` to set colors for atb-log when outputting onto a tty. Default: 'on'.
+
+* Add option `--init` to initialize a new `DESTINATION`.
+
+* Add option `-t, --time` to list all versions of a specific file.
+  Inspired by [rsync-time-browse](https://github.com/uglygus/rsync-time-browse),
+  this is Bash version implementation, replacing the original Python version.
+
 ## ATB usage
 
 ```
 Usage: atb.sh [OPTION]... <[USER@HOST:]SOURCE> <[USER@HOST:]DESTINATION>
 
 Options
- -c, --color <on|off>   Colorize the log info warn error output in a tty.
- -p, --profile          Specify a backup profile. The profile can be used to set
-                        SOURCE, DESTINATION, the binary of ssh and rsync,
-                        the flags of ssh and rsync, expiration strategy,
-                        auto-expire and filter rules for backup files.
- --ssh-get-flags        Display the default SSH flags that are used for backup.
- --ssh-set-flags        Set the SSH flags that are used for backup.
- --ssh-append-flags     Append the SSH flags that are going to be used for backup.
- --rsync-get-flags      Display the default rsync flags that are used for backup.
-                        If using remote drive over SSH, --compress will be added.
- --rsync-set-flags      Set the rsync flags that are used for backup.
- --rsync-append-flags   Append the rsync flags that are going to be used for backup.
- --strategy             Set the expiration strategy. Default: "1:1 30:7 365:30" means after one
-                        day, keep one backup per day. After 30 days, keep one backup every 7 days.
-                        After 365 days keep one backup every 30 days.
- --no-auto-expire       Disable automatically deleting backups when out of space. Instead an error
-                        is logged, and the backup is aborted.
- --log-dir              Set the log file directory. If this flag is set, generated files will
-                        not be managed by the script - in particular they will not be
-                        automatically deleted.
-                        Default: /home/shmilee/.atb
- -h, --help             Display this help message.
+ -p, --profile </path/to/profile>
+                       Specify a backup profile. The profile can be used to set
+                       SOURCE, DESTINATION, the binary of ssh and rsync,
+                       the flags of ssh and rsync, expiration strategy,
+                       auto-expire and filter rules for backup files.
+ --ssh-get-flags       Display the default SSH flags that are used for backup and exit.
+ --ssh-set-flags       Set the SSH flags that are used for backup.
+ --ssh-append-flags    Append the SSH flags that are going to be used for backup.
+ --rsync-get-flags     Display the default rsync flags that are used for backup and exit.
+                       If using remote drive over SSH, --compress will be added.
+ --rsync-set-flags     Set the rsync flags that are used for backup.
+ --rsync-append-flags  Append the rsync flags that are going to be used for backup.
+ --strategy            Set the expiration strategy. Default: "1:1 30:7 365:30" means after one
+                       day, keep one backup per day. After 30 days, keep one backup every 7 days.
+                       After 365 days keep one backup every 30 days.
+ --no-auto-expire      Disable automatically deleting backups when out of space. Instead an error
+                       is logged, and the backup is aborted.
+ --log-dir </path>     Set the log file directory. If this flag is set, generated files will
+                       not be managed by the script - in particular they will not be
+                       automatically deleted.
+                       Default: /home/shmilee/.atb
+ -c, --color <on|off>  Colorize the log info warn error output in a tty.
+ --init <DESTINATION>  Initialize <DESTINATION> by creating a backup marker file and exit.
+ -t, --time </path/to/aspecific/file> [LINKS_DIR]
+                       List all versions of a specific file in a backup DESTINATION and exit.
+                       Optional LINKS_DIR is used to create new links for each unique file.
+ -h, --help            Display this help message and exit.
 ```
 
 * Backup with profile `atb-example.prf`
