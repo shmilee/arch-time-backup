@@ -8,8 +8,7 @@ It is modified to support some new features and mainly used to back up my Arch L
 ## ATB features
 
 * Support to read a backup profile (configfile), like [rtb-wrapper](https://github.com/thomas-mc-work/rtb-wrapper).
-  The profile contains most options and parameters of `atb.sh`, except `-p`, `--profile` and `--log-dir`, etc.
-  It is used to set,
+  The profile is used to set these options and parameters of `atb.sh`, such as:
     + `SOURCE` of backup
     + `DESTINATION` of backup
     + (optional) the binary of ssh and rsync
@@ -40,9 +39,10 @@ It is modified to support some new features and mainly used to back up my Arch L
 
 * Add option `--init` to initialize a new `DESTINATION`.
 
-* Add option `-t, --time` to list all versions of a specific file.
+* Add option `-t, --time-travel` to list all versions of a specific file.
   Inspired by [rsync-time-browse](https://github.com/uglygus/rsync-time-browse),
   this is Bash version implementation, replacing the original Python version.
+  A `GIT_REPO_DIR` or `LINKS_DIR` can be set to compare different versions of the specific file and view its history.
 
 ## ATB usage
 
@@ -50,7 +50,7 @@ It is modified to support some new features and mainly used to back up my Arch L
 Usage: atb.sh [OPTION]... <[USER@HOST:]SOURCE> <[USER@HOST:]DESTINATION>
 
 Options
- -p, --profile </path/to/profile>
+ -p, --profile </local/path/to/profile>
                        Specify a backup profile. The profile can be used to set
                        SOURCE, DESTINATION, the binary of ssh and rsync,
                        the flags of ssh and rsync, expiration strategy,
@@ -72,11 +72,15 @@ Options
                        not be managed by the script - in particular they will not be
                        automatically deleted.
                        Default: /home/shmilee/.atb
- -c, --color <on|off>  Colorize the log info warn error output in a tty.
+ --no-color            Disable colorizing the log info warn error output in a tty.
  --init <DESTINATION>  Initialize <DESTINATION> by creating a backup marker file and exit.
- -t, --time </path/to/a/specific/file> [LINKS_DIR]
+ -t, --time-travel </local/path/to/a/specific/file>
                        List all versions of a specific file in a backup DESTINATION and exit.
-                       Optional LINKS_DIR is used to create new links for each unique file.
+ -tig|--tig|--travel-in-git <GIT_REPO_DIR>
+                       Create a git repo and commit all versions of the specific file.
+                       This is especially useful when the specific file is a text file.
+ -tib|--tib|--travel-in-browser <LINKS_DIR>
+                       Create links for all versions of the specific file in a directory.
  -h, --help            Display this help message and exit.
 ```
 
@@ -118,6 +122,38 @@ Host    backup.vps
     #ProxyCommand ssh -W %h:%p proxy.vps
 
 [$] atb.sh /home user@backup.vps:/mnt/backup_drive
+```
+
+* Make a time travel of `/local/backup/of/a/specific/file`
+
+```
+[$] atb.sh -t /media/BackArch/atb-slim-backup/latest/home/shmilee/.mozilla/...../recovery.jsonlz4 \
+    -tig /media/BackArch/time-link/tig-12 -tib /media/BackArch/time-link/links-12
+[atb] The Backup DESTINATION is /media/BackArch/atb-slim-backup
+[atb] Specific Version:       2024-09-09-112627
+[atb] Specific Relative Path: home/shmilee/.mozilla/...../recovery.jsonlz4
+[atb] Found 21 whole backups and the specific file has 18 backups.
+[atb] 	2024-09-08-121550: inode=770605, md5=2ffce7d92778036a0ac2669c254bf6d4, size=223876
+[atb] 	2024-09-08-122344: inode=770605
+[atb] 	2024-09-08-122724: inode=770605
+[atb] 	2024-09-08-122821: inode=770605
+[atb] 	2024-09-08-124224: inode=770605
+[atb] 	2024-09-08-125308: inode=838306, md5=2daf35a585fcf388e5730f596a21ea2c, size=222602
+[atb] 	2024-09-08-134251: inode=851870, md5=8b015c84482d591abf5a4b8492a54c52, size=207270
+[atb] 	2024-09-08-134323: inode=851870
+[atb] 	2024-09-08-134504: inode=851870
+[atb] 	2024-09-08-134511: inode=851870
+[atb] 	2024-09-08-134526: inode=851870
+[atb] 	2024-09-08-170730: inode=919834, md5=e06190ac8dc3dfce7b80bc26e44b492a, size=234497
+[atb] 	2024-09-09-081344: inode=933744, md5=cb37f164375a17a5fd0d24af9c1d5259, size=180628
+[atb] 	2024-09-09-102047: inode=947281, md5=17c8c042a74c1fd0ec38b1cebfe0d2fe, size=223680
+[atb] 	2024-09-09-112456: inode=960879, md5=364c38d9008c50c82cebf95292132385, size=223893
+[atb] 	2024-09-09-112508: inode=960879
+[atb] 	2024-09-09-112620: inode=960879
+[atb] 	2024-09-09-112627: inode=960879
+[atb] Found 7 versions of the specific file.
+[atb] TRAVEL_GIT_REPO  /media/BackArch/time-link/tig-12 is ready.
+[atb] TRAVEL_LINKS_DIR /media/BackArch/time-link/links-12 is ready.
 ```
 
 ## other

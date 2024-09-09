@@ -59,7 +59,7 @@ fn_display_usage() {
     echo "Usage: $(basename "$0") [OPTION]... <[USER@HOST:]SOURCE> <[USER@HOST:]DESTINATION>"
     echo ""
     echo "Options"
-    echo " -p, --profile </path/to/profile>"
+    echo " -p, --profile </local/path/to/profile>"
     echo "                       Specify a backup profile. The profile can be used to set"
     echo "                       SOURCE, DESTINATION, the binary of ssh and rsync,"
     echo "                       the flags of ssh and rsync, expiration strategy,"
@@ -83,9 +83,13 @@ fn_display_usage() {
     echo "                       Default: $LOG_DIR"
     echo " --no-color            Disable colorizing the log info warn error output in a tty."
     echo " --init <DESTINATION>  Initialize <DESTINATION> by creating a backup marker file and exit."
-    echo " -t, --time </path/to/a/specific/file> [LINKS_DIR]"
+    echo " -t, --time-travel </local/path/to/a/specific/file>"
     echo "                       List all versions of a specific file in a backup DESTINATION and exit."
-    echo "                       Optional LINKS_DIR is used to create new links for each unique file."
+    echo " -tig|--tig|--travel-in-git <GIT_REPO_DIR>"
+    echo "                       Create a git repo and commit all versions of the specific file."
+    echo "                       This is especially useful when the specific file is a text file."
+    echo " -tib|--tib|--travel-in-browser <LINKS_DIR>"
+    echo "                       Create links for all versions of the specific file in a directory."
     echo " -h, --help            Display this help message and exit."
     echo ""
     echo "For more detailed help, please see the README file:"
@@ -306,9 +310,180 @@ fn_initialize_dest() {
     fi
 }
 
+fn_local_fileinode() {
+    (
+        ls -i "$1" 2>/dev/null ||
+        find "$1" -printf "%i" 2>/dev/null ||
+        stat -c%i -- "$1" 2>/dev/null ||
+        stat -f%i -- "$1" 2>/dev/null
+    ) | awk '{print $1}'
+}
+
+fn_local_filesize() {  # in bytes
+    (
+        find "$1" -printf "%s" 2>/dev/null ||
+        stat --printf="%s" -- "$1" 2>/dev/null ||
+        stat -c%s -- "$1" 2>/dev/null ||
+        stat -f%z -- "$1" 2>/dev/null
+    ) | awk '{print $1}'
+}
+
 fn_time_travel() {
-    #TODO
-    fn_log_error "not implemented!"
+    # ref: https://github.com/uglygus/rsync-time-browse
+    local specific="$TRAVEL_SPEC_FILE"
+    if [ ! -f "$specific" ]; then
+        if [ -d "$specific" ]; then
+            fn_log_error "Directory not supported: '$specific'"
+        elif echo "$specific" | grep -Eq '^[A-Za-z0-9\._%\+\-]+@[A-Za-z0-9.\-]+:.+$'; then
+            fn_log_error "Remote path not supported: '$specific'"
+        else
+            fn_log_error "File not found: '$specific'"
+        fi
+        exit 4
+    fi
+    # 1. find DESTINATION folder containing 'backup.marker'
+    specific="$(realpath "$specific")"  # symlink or relative resolved
+    local DEST_FOLDER="$(dirname "$specific")"
+    while [ "$DEST_FOLDER" != '/' ]; do
+        #fn_log_info "Checking DEST_FOLDER = $DEST_FOLDER"
+        if [ -f "$(fn_backup_marker_path "$DEST_FOLDER")" ]; then
+            break
+        fi
+        # walk back
+        DEST_FOLDER="$(dirname "$DEST_FOLDER")"
+    done
+    if [ "$DEST_FOLDER" = '/' ]; then
+        fn_log_error "Cannot find backup marker path for '$specific'"
+        exit 4
+    else
+        fn_log_info "The Backup DESTINATION is $DEST_FOLDER"
+    fi
+    # 2. check date/time pattern, get relative file path
+    local datepattern="[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{6}"  # -E
+    if ! echo "${specific}" | grep -Eq "$DEST_FOLDER/$datepattern/"; then
+        fn_log_error "Unable to determine the date version of: '${specific}'"
+        exit 4
+    fi
+    local DATEVER="$(echo "${specific}" | sed -E "s|^$DEST_FOLDER/($datepattern)/.*$|\1|")"
+    local REL_APTH="$(echo "${specific}" | sed -E "s|^$DEST_FOLDER/$datepattern/(.*)$|\1|")"
+    #local REL_APTH=${specific#$DEST_FOLDER/????-??-??-??????/}
+    fn_log_info "Specific Version:       $DATEVER"
+    fn_log_info "Specific Relative Path: $REL_APTH"
+    # 3. get the date/time folder names for backup folders
+    local BACKUP_NAMES=($(fn_find_backups "$DEST_FOLDER" | sort))
+    local DATE_VERSIONS=()
+    for back in ${BACKUP_NAMES[@]}; do
+        if [ -f "$back/$REL_APTH" ]; then
+            DATE_VERSIONS+=("$(basename $back)")
+        fi
+    done
+    fn_log_info_gb "Found ${GREEN}${#BACKUP_NAMES[@]}${COFF} whole backups and the specific file has ${GREEN}${#DATE_VERSIONS[@]}${COFF} backups."
+    # 4. process date versions from oldest to latest, get and show unique files
+    #    compared by file inode, faster than size or hash
+    #local pre_size=""
+    #local pre_hash=""  # md5
+    local pre_inode=""
+    local UNIQ_VERSIONS=()  # date of unique files
+    local size_max=$((100*1024*1024))  # in bytes, show file md5 when its size<size_max(100M)
+    for datever in ${DATE_VERSIONS[@]}; do
+        local file="$DEST_FOLDER/$datever/$REL_APTH"
+        #this_size="$(fn_local_filesize "$file")"
+        #this_hash="$(md5sum "$file" | awk '{print $1}')"
+        #if [ "$this_size" != "$pre_size" -o "$this_hash" != "$pre_hash" ];
+        #    UNIQ_VERSIONS+=("$datever")
+        #fi
+        local this_inode=$(fn_local_fileinode "$file")
+        if [ "$this_inode" != "$pre_inode" ]; then
+            local this_size="$(fn_local_filesize "$file")"
+            local this_hash=""
+            if [ "$this_size" -lt $size_max ]; then
+                this_hash=", md5=$(md5sum "$file" | awk '{print $1}')"
+            fi
+            fn_log_info_gb "\t$datever: inode=$this_inode$this_hash, size=$this_size"
+            UNIQ_VERSIONS+=("$datever")
+        else
+            fn_log_info "\t$datever: inode=$this_inode"
+        fi
+        pre_inode=$this_inode
+    done
+    fn_log_info_gb "Found ${GREEN}${#UNIQ_VERSIONS[@]}${COFF} versions of the specific file."
+    if [ "${#UNIQ_VERSIONS}" -lt 2 ]; then
+        fn_log_info_gb "Less than 2 versions to compare!"
+        exit
+    fi
+    # 5. prepare TRAVEL_GIT_REPO TRAVEL_LINKS_DIR
+    local GIT_action   # ln, cp. depends on TRAVEL_GIT_REPO mountpoint (mp)
+    local LDIR_action  # ln, ln-s. depends on TRAVEL_LINKS_DIR mountpoint
+    local DEST_mp="$(df "$DEST_FOLDER" | awk '{if(NR==2){print $6}}')"
+    if [ -n "$TRAVEL_GIT_REPO" ]; then
+        if [ -d "$TRAVEL_GIT_REPO" ]; then
+            fn_log_error "Git repository '$TRAVEL_GIT_REPO' exists! Skip to create the repository!"
+        else
+            git init -q -b master "$TRAVEL_GIT_REPO"
+            local git_mp="$(df "$TRAVEL_GIT_REPO" | awk '{if(NR==2){print $6}}')"
+            #fn_log_info "mountpoint: DEST($DEST_mp) vs git($git_mp)"
+            if [ "$DEST_mp" = "$git_mp" ]; then
+                GIT_action='ln'
+            else
+                GIT_action='cp'
+            fi
+        fi
+    fi
+    if [ -n "$TRAVEL_LINKS_DIR" ]; then
+        if [ -d "$TRAVEL_LINKS_DIR" ]; then
+            fn_log_error "Directory '$TRAVEL_LINKS_DIR' exists! Skip to create links for file versions!"
+        else
+            mkdir -p -- "$TRAVEL_LINKS_DIR"
+            local ldir_mp="$(df "$TRAVEL_LINKS_DIR" | awk '{if(NR==2){print $6}}')"
+            #fn_log_info "mountpoint: DEST($DEST_mp) vs link-dir($ldir_mp)"
+            if [ "$DEST_mp" = "$ldir_mp" ]; then
+                LDIR_action='ln'
+            else
+                LDIR_action='ln-s'
+            fi
+        fi
+    fi
+    #fn_log_info "GIT_action=$GIT_action, LDIR_action=$LDIR_action"
+    # 6. ln or cp unique files
+    if [ "$GIT_action" != "" -o "$LDIR_action" != "" ]; then
+        local base="$(basename "$REL_APTH")"
+        for datever in ${UNIQ_VERSIONS[@]}; do
+            local file="$DEST_FOLDER/$datever/$REL_APTH"
+            # git repo
+            if [ "$GIT_action" != "" ]; then
+                if [ "$GIT_action" = "ln" ]; then
+                    ln -f "$file" "$TRAVEL_GIT_REPO/$base"
+                elif [ "$GIT_action" = "cp" ]; then
+                    cp -f "$file" "$TRAVEL_GIT_REPO/$base"
+                fi
+                (
+                    cd "$TRAVEL_GIT_REPO" &&
+                        git add "$base" &&
+                        git commit -q -m "$datever" -m "$file"
+                )
+            fi
+            # links-dir
+            if [ "$LDIR_action" != "" ]; then
+                if [ "$LDIR_action" = "ln" ]; then
+                    ln "$file" "$TRAVEL_LINKS_DIR/${datever}-${base}"
+                elif [ "$LDIR_action" = "ln-s" ]; then
+                    ln -s "$file" "$TRAVEL_LINKS_DIR/${datever}-${base}"
+                fi
+            fi
+        done
+        if [ "$GIT_action" != "" ]; then
+            fn_log_info "TRAVEL_GIT_REPO  ${YELLOW}$TRAVEL_GIT_REPO${COFF} is ready."
+        fi
+        if [ "$LDIR_action" != "" ]; then
+            fn_log_info "TRAVEL_LINKS_DIR ${YELLOW}$TRAVEL_LINKS_DIR${COFF} is ready."
+        fi
+    else
+        local i=1
+        for datever in ${UNIQ_VERSIONS[@]}; do
+            fn_log_info " $i) $DEST_FOLDER/$datever/$REL_APTH"
+            ((i++))
+        done
+    fi
 }
 
 # ---------------------------------------------------------------------------
@@ -334,6 +509,10 @@ AUTO_EXPIRE="1"
 
 RSYNC_BIN="rsync"
 RSYNC_FLAGS="-D --numeric-ids --links --hard-links --one-file-system --itemize-changes --times --recursive --perms --owner --group --stats --human-readable"
+
+TRAVEL_SPEC_FILE=""
+TRAVEL_GIT_REPO=""
+TRAVEL_LINKS_DIR=""
 
 while :; do
     case $1 in
@@ -392,10 +571,17 @@ while :; do
             fn_initialize_dest "$1"
             exit
             ;;
-        -t|--time)
+        -t|--time-travel)
             shift
-            fn_time_travel "$1" "$2"
-            exit
+            TRAVEL_SPEC_FILE="$1"
+            ;;
+        -tig|--tig|--travel-in-git)
+            shift
+            TRAVEL_GIT_REPO="$(realpath "$1")"
+            ;;
+        -tib|--tib|--travel-in-browser)
+            shift
+            TRAVEL_LINKS_DIR="$(realpath "$1")"
             ;;
         --)
             shift
@@ -416,6 +602,12 @@ while :; do
 
     shift
 done
+
+# time travel of specific file, then exit
+if [ -n "$TRAVEL_SPEC_FILE" ]; then
+    fn_time_travel
+    exit
+fi
 
 # Display usage information if required arguments are not passed
 if [[ -z "$SRC_FOLDER" || -z "$DEST_FOLDER" ]]; then
