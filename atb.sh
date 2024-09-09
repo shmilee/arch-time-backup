@@ -8,10 +8,17 @@ APPNAME=$(basename "$0" | sed "s/\.sh$//")
 # ---------------------------------------------------------------------------
 # Log functions
 # ---------------------------------------------------------------------------
+fn_no_color() {
+    COFF=""
+    BOLD=""
+    BLUE=""
+    GREEN=""
+    YELLOW=""
+    RED=""
+}
 fn_set_color() {
-    local usecolor="$1"  # on, off
-    # https://unix.stackexchange.com/questions/401934
-    if [ "$usecolor" != "off" -a -t 1 -a -t 2 ]; then
+    # if in a tty, https://unix.stackexchange.com/questions/401934
+    if [ -t 1 -a -t 2 ]; then
         COFF="\e[1;0m"
         BOLD="\e[1;1m"
         BLUE="${BOLD}\e[1;34m"
@@ -19,14 +26,8 @@ fn_set_color() {
         YELLOW="${BOLD}\e[1;33m"
         RED="${BOLD}\e[1;31m"
     else
-        COFF=""
-        BOLD=""
-        BLUE=""
-        GREEN=""
-        YELLOW=""
-        RED=""
+        fn_no_color
     fi
-    #readonly COFF BOLD BLUE GREEN YELLOW RED
 }
 fn_set_color  # default on
 fn_log_info() { echo -e "${BLUE}[${APPNAME}]${COFF} $1"; }
@@ -80,7 +81,7 @@ fn_display_usage() {
     echo "                       not be managed by the script - in particular they will not be"
     echo "                       automatically deleted."
     echo "                       Default: $LOG_DIR"
-    echo " -c, --color <on|off>  Colorize the log info warn error output in a tty."
+    echo " --no-color            Disable colorizing the log info warn error output in a tty."
     echo " --init <DESTINATION>  Initialize <DESTINATION> by creating a backup marker file and exit."
     echo " -t, --time </path/to/a/specific/file> [LINKS_DIR]"
     echo "                       List all versions of a specific file in a backup DESTINATION and exit."
@@ -382,9 +383,9 @@ while :; do
             LOG_DIR="$1"
             AUTO_DELETE_LOG="0"
             ;;
-        -c|--color)
+        --no-color)
             shift
-            fn_set_color "$1"
+            fn_no_color
             ;;
         --init)
             shift
@@ -404,7 +405,6 @@ while :; do
             ;;
         -*)
             fn_log_error "Unknown option: \"$1\""
-            fn_log_info ""
             fn_display_usage
             exit 1
             ;;

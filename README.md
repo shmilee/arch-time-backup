@@ -35,7 +35,8 @@ It is modified to support some new features and mainly used to back up my Arch L
   When using a profile, the filter rules will be written to a temporary file first
   and then taken by rsync option `--filter="merge a.tmpfile.of.rules"`.
 
-* Add option `-c, --color <on|off>` to set colors for atb-log when outputting onto a tty. Default: 'on'.
+* When atb.sh outputting log onto a tty, colorize the info, warn, error.
+  Option `--no-color` is added to disable this.
 
 * Add option `--init` to initialize a new `DESTINATION`.
 
