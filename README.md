@@ -165,6 +165,14 @@ Host    backup.vps
 The original document of `rsync-time-backup` is [below](#Rsync-time-backup).
 The forked version of `rsync-time-backup` is `v1.1.5-41-g7af3df3`. (get by `git describe --long --tags`)
 
+* About the expiration strategy, which backup to keep,
+  check function `fn_expire_backups()` and var `oldest_backup_to_keep` in `atb.sh`.
+  The `1:1 30:7 365:30` means:
+    - After **1** day, keep one oldest backup every **1** day (**1:1**).
+    - After **30** days, keep one oldest backup every **7** days (**30:7**).
+    - After **365** days, keep one oldest backup every **30** days (**365:30**).
+
+
 # Rsync time backup
 
 This script offers Time Machine-style backup using rsync. It creates incremental backups of files and directories to the destination of your choice. The backups are structured in a way that makes it easy to recover any file at any point in time.
