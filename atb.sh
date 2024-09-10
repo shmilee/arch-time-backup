@@ -65,6 +65,16 @@ fn_log_info_cmd() {
         printf "${BLUE}[${APPNAME^}]${ALLOFF} ${BOLD}${msg}${ALLOFF}\n" "$@"
     fi
 }
+fn_log_info_ask() {
+    local msg=$1 yesno; shift
+    printf "${RED}[${APPNAME}]${ALLOFF} ${BOLD}${msg} [y/n] ${ALLOFF}" "$@"
+    read yesno
+    if [ "$yesno" = "y" -o "$yesno" = "Y" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
 
 # ---------------------------------------------------------------------------
 # Make sure everything really stops when CTRL+C is pressed
@@ -95,6 +105,7 @@ fn_display_usage() {
     echo " --strategy            Set the expiration strategy. Default: \"1:1 30:7 365:30\" means after one"
     echo "                       day, keep one backup per day. After 30 days, keep one backup every 7 days."
     echo "                       After 365 days keep one backup every 30 days."
+    echo " --strategy-noconfirm  Skip any confirmation when deleting backups according to the strategy."
     echo " --no-auto-expire      Disable automatically deleting backups when out of space. Instead an error"
     echo "                       is logged, and the backup is aborted."
     echo " --log-dir </path>     Set the log file directory. If this flag is set, generated files will"
@@ -148,8 +159,14 @@ fn_expire_backup() {
         fn_log_error "%s is not on a backup destination - aborting." "$1"
         exit 1
     fi
-    fn_log_info "Expiring %s" "$1"
-    fn_rm_dir "$1"
+    if [[ "$STRATEGY_CONFIRM" == "0" ]]; then
+        fn_log_info "Expiring %s" "$1"
+        fn_rm_dir "$1"
+    else
+        if fn_log_info_ask "Expiring %s" "$1"; then
+            fn_rm_dir "$1"
+        fi
+    fi
 }
 
 fn_expire_backups() {
@@ -526,9 +543,10 @@ SRC_FOLDER=""
 DEST_FOLDER=""
 FILTER_RULES=""
 LOG_DIR="$HOME/.$APPNAME"
-AUTO_DELETE_LOG="1"
+AUTO_DELETE_LOG="1"  # on
 EXPIRATION_STRATEGY="1:1 30:7 365:30"
-AUTO_EXPIRE="1"
+STRATEGY_CONFIRM="1"  # on
+AUTO_EXPIRE="1"  # on
 
 RSYNC_BIN="rsync"
 RSYNC_FLAGS="-D --numeric-ids --links --hard-links --one-file-system --itemize-changes --times --recursive --perms --owner --group --stats --human-readable"
@@ -576,6 +594,9 @@ while :; do
         --strategy)
             shift
             EXPIRATION_STRATEGY="$1"
+            ;;
+        --strategy-noconfirm)
+            STRATEGY_CONFIRM="0"
             ;;
         --no-auto-expire)
             AUTO_EXPIRE="0"

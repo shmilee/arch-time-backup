@@ -34,6 +34,9 @@ It is modified to support some new features and mainly used to back up my Arch L
   When using a profile, the filter rules will be written to a temporary file first
   and then taken by rsync option `--filter="merge a.tmpfile.of.rules"`.
 
+* Ask for confirmation when deleting backups according to the strategy.
+  Use option `--strategy-noconfirm` to skip confirmation. Be cautious when deleting data.
+
 * When atb.sh outputting log onto a tty, colorize the info, warn, error.
   Option `--no-color` is added to disable this.
 
@@ -66,6 +69,7 @@ Options
  --strategy            Set the expiration strategy. Default: "1:1 30:7 365:30" means after one
                        day, keep one backup per day. After 30 days, keep one backup every 7 days.
                        After 365 days keep one backup every 30 days.
+ --strategy-noconfirm  Skip any confirmation when deleting backups according to the strategy.
  --no-auto-expire      Disable automatically deleting backups when out of space. Instead an error
                        is logged, and the backup is aborted.
  --log-dir </path>     Set the log file directory. If this flag is set, generated files will
