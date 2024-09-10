@@ -4,12 +4,13 @@
 # License: MIT
 
 APPNAME=$(basename "$0" | sed "s/\.sh$//")
+APPVERSION="2.0.0"
 
 # ---------------------------------------------------------------------------
 # Log functions
 # ---------------------------------------------------------------------------
 fn_no_color() {
-    COFF=""
+    ALLOFF=""
     BOLD=""
     BLUE=""
     GREEN=""
@@ -19,7 +20,7 @@ fn_no_color() {
 fn_set_color() {
     # if in a tty, https://unix.stackexchange.com/questions/401934
     if [ -t 1 -a -t 2 ]; then
-        COFF="\e[1;0m"
+        ALLOFF="\e[1;0m"
         BOLD="\e[1;1m"
         BLUE="${BOLD}\e[1;34m"
         GREEN="${BOLD}\e[1;32m"
@@ -30,19 +31,38 @@ fn_set_color() {
     fi
 }
 fn_set_color  # default on
-fn_log_info() { echo -e "${BLUE}[${APPNAME}]${COFF} $1"; }
-fn_log_info_gb() { echo -e "${GREEN}[${APPNAME}]${COFF} ${BOLD}$1${COFF}"; }
+fn_log_info() {
+    local msg=$1; shift
+    printf "${BLUE}[${APPNAME}]${ALLOFF} ${msg}${ALLOFF}\n" "$@"
+}
 fn_log_warn() {
-    echo -e "${YELLOW}[${APPNAME^^}]${COFF} ${BOLD}WARNING: $1${COFF}" 1>&2
+    local msg=$1; shift
+    printf "${YELLOW}[${APPNAME^^}] WARNING:${ALLOFF} ${BOLD}${msg}${ALLOFF}\n" "$@" >&2
 }
 fn_log_error() {
-    echo -e "${RED}[${APPNAME^^}]${COFF} ${BOLD}ERROR: $1${COFF}" 1>&2
+    local msg=$1; shift
+    printf "${RED}[${APPNAME^^}] ERROR:${ALLOFF} ${BOLD}${msg}${ALLOFF}\n" "$@" >&2
+}
+fn_log_info_hl() {
+    # inputs example: "c" "msg %b msg" "arg"
+    # use "%b" when arg with '\', such as '\e[1;0m'
+    local color="$1" msg="$2"
+    if [ -n "${color}" ]; then
+        local highlight=()
+        for arg in "${@:3}"; do
+            highlight+=("${color}${arg}${ALLOFF}${BOLD}")
+        done
+    else
+        local highlight="${@:3}"
+    fi
+    printf "${BLUE}[${APPNAME}]${ALLOFF} ${BOLD}${msg}${ALLOFF}\n" "${highlight[@]}"
 }
 fn_log_info_cmd() {
+    local msg=$1; shift
     if [ -n "$SSH_DEST_FOLDER_PREFIX" ]; then
-        echo -e "${BLUE}[${APPNAME^}]${COFF} ${BOLD}$SSH_CMD '$1'${COFF}"
+        printf "${BLUE}[${APPNAME^}]${ALLOFF} ${BOLD}$SSH_CMD '${msg}'${ALLOFF}\n" "$@"
     else
-        echo -e "${BLUE}[${APPNAME^}]${COFF} ${BOLD}$1${COFF}"
+        printf "${BLUE}[${APPNAME^}]${ALLOFF} ${BOLD}${msg}${ALLOFF}\n" "$@"
     fi
 }
 
@@ -125,10 +145,10 @@ fn_expire_backup() {
     # Double-check that we're on a backup destination to be completely
     # sure we're deleting the right folder
     if [ -z "$(fn_find_backup_marker "$(dirname -- "$1")")" ]; then
-        fn_log_error "$1 is not on a backup destination - aborting."
+        fn_log_error "%s is not on a backup destination - aborting." "$1"
         exit 1
     fi
-    fn_log_info "Expiring $1"
+    fn_log_info "Expiring %s" "$1"
     fn_rm_dir "$1"
 }
 
@@ -145,7 +165,7 @@ fn_expire_backups() {
         local backup_timestamp=$(fn_parse_date "$backup_date")
         # Skip if failed to parse date...
         if [ -z "$backup_timestamp" ]; then
-            fn_log_warn "Could not parse date: $backup_dir"
+            fn_log_warn "Could not parse date: %s" "$backup_dir"
             continue
         fi
         if [ "$backup_dir" == "$backup_to_keep" ]; then
@@ -199,7 +219,7 @@ fn_expire_backups() {
 fn_parse_profile() {
     local PRF="$1"
     if [ ! -f "${PRF}" ]; then
-        fn_log_error "Profile not found: '${PRF}'!"
+        fn_log_error "Profile not found: '%s'!" "${PRF}"
         exit 2
     fi
     local fname="$(basename "${PRF}")"
@@ -253,7 +273,7 @@ fn_parse_ssh() {
 
 fn_check_BIN() {
     if ! hash "$1" &>/dev/null; then
-        fn_log_error "Command not found: '$1'!"
+        fn_log_error "Command not found: '%s'!" "$1"
         exit 3
     fi
 }
@@ -304,7 +324,7 @@ fn_initialize_dest() {
         fn_touch "$marker_path"
         exit
     else
-        fn_log_info "A backup marker is found in '$1'!"
+        fn_log_info "A backup marker is found in '%s'!" "$1"
         fn_log_warn "The backup DESTINATION folder has been initialized!"
         exit 1
     fi
@@ -333,11 +353,11 @@ fn_time_travel() {
     local specific="$TRAVEL_SPEC_FILE"
     if [ ! -f "$specific" ]; then
         if [ -d "$specific" ]; then
-            fn_log_error "Directory not supported: '$specific'"
+            fn_log_error "Directory not supported: '%s'" "$specific"
         elif echo "$specific" | grep -Eq '^[A-Za-z0-9\._%\+\-]+@[A-Za-z0-9.\-]+:.+$'; then
-            fn_log_error "Remote path not supported: '$specific'"
+            fn_log_error "Remote path not supported: '%s'" "$specific"
         else
-            fn_log_error "File not found: '$specific'"
+            fn_log_error "File not found: '%s'" "$specific"
         fi
         exit 4
     fi
@@ -353,22 +373,22 @@ fn_time_travel() {
         DEST_FOLDER="$(dirname "$DEST_FOLDER")"
     done
     if [ "$DEST_FOLDER" = '/' ]; then
-        fn_log_error "Cannot find backup marker path for '$specific'"
+        fn_log_error "Cannot find backup marker path for '%s'" "$specific"
         exit 4
     else
-        fn_log_info "The Backup DESTINATION is $DEST_FOLDER"
+        fn_log_info "The Backup DESTINATION is %s" "$DEST_FOLDER"
     fi
     # 2. check date/time pattern, get relative file path
     local datepattern="[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{6}"  # -E
     if ! echo "${specific}" | grep -Eq "$DEST_FOLDER/$datepattern/"; then
-        fn_log_error "Unable to determine the date version of: '${specific}'"
+        fn_log_error "Unable to determine the date version of: '%s'" "${specific}"
         exit 4
     fi
     local DATEVER="$(echo "${specific}" | sed -E "s|^$DEST_FOLDER/($datepattern)/.*$|\1|")"
     local REL_APTH="$(echo "${specific}" | sed -E "s|^$DEST_FOLDER/$datepattern/(.*)$|\1|")"
     #local REL_APTH=${specific#$DEST_FOLDER/????-??-??-??????/}
-    fn_log_info "Specific Version:       $DATEVER"
-    fn_log_info "Specific Relative Path: $REL_APTH"
+    fn_log_info "Specific Version:       %s" "$DATEVER"
+    fn_log_info "Specific Relative Path: %s" "$REL_APTH"
     # 3. get the date/time folder names for backup folders
     local BACKUP_NAMES=($(fn_find_backups "$DEST_FOLDER" | sort))
     local DATE_VERSIONS=()
@@ -377,7 +397,9 @@ fn_time_travel() {
             DATE_VERSIONS+=("$(basename $back)")
         fi
     done
-    fn_log_info_gb "Found ${GREEN}${#BACKUP_NAMES[@]}${COFF} whole backups and the specific file has ${GREEN}${#DATE_VERSIONS[@]}${COFF} backups."
+    fn_log_info_hl "${GREEN}" \
+        "Found %b whole backups and %b backups of the specific file." \
+        ${#BACKUP_NAMES[@]} ${#DATE_VERSIONS[@]}
     # 4. process date versions from oldest to latest, get and show unique files
     #    compared by file inode, faster than size or hash
     #local pre_size=""
@@ -399,16 +421,17 @@ fn_time_travel() {
             if [ "$this_size" -lt $size_max ]; then
                 this_hash=", md5=$(md5sum "$file" | awk '{print $1}')"
             fi
-            fn_log_info_gb "\t$datever: inode=$this_inode$this_hash, size=$this_size"
+            fn_log_info_hl '' "\t%s: inode=%s%s, size=%s" \
+                "$datever" "$this_inode" "$this_hash" "$this_size"
             UNIQ_VERSIONS+=("$datever")
         else
-            fn_log_info "\t$datever: inode=$this_inode"
+            fn_log_info "\t%s: inode=%s" "$datever" "$this_inode"
         fi
         pre_inode=$this_inode
     done
-    fn_log_info_gb "Found ${GREEN}${#UNIQ_VERSIONS[@]}${COFF} versions of the specific file."
+    fn_log_info_hl "${GREEN}" "Found %b versions of the specific file." ${#UNIQ_VERSIONS[@]}
     if [ "${#UNIQ_VERSIONS}" -lt 2 ]; then
-        fn_log_info_gb "Less than 2 versions to compare!"
+        fn_log_info_hl '' "Less than 2 versions to compare!"
         exit
     fi
     # 5. prepare TRAVEL_GIT_REPO TRAVEL_LINKS_DIR
@@ -417,7 +440,7 @@ fn_time_travel() {
     local DEST_mp="$(df "$DEST_FOLDER" | awk '{if(NR==2){print $6}}')"
     if [ -n "$TRAVEL_GIT_REPO" ]; then
         if [ -d "$TRAVEL_GIT_REPO" ]; then
-            fn_log_error "Git repository '$TRAVEL_GIT_REPO' exists! Skip to create the repository!"
+            fn_log_error "Git repository '%s' exists! Skip to create the repository!" "$TRAVEL_GIT_REPO"
         else
             git init -q -b master "$TRAVEL_GIT_REPO"
             local git_mp="$(df "$TRAVEL_GIT_REPO" | awk '{if(NR==2){print $6}}')"
@@ -431,7 +454,7 @@ fn_time_travel() {
     fi
     if [ -n "$TRAVEL_LINKS_DIR" ]; then
         if [ -d "$TRAVEL_LINKS_DIR" ]; then
-            fn_log_error "Directory '$TRAVEL_LINKS_DIR' exists! Skip to create links for file versions!"
+            fn_log_error "Directory '%s' exists! Skip to create links for file versions!" "$TRAVEL_LINKS_DIR"
         else
             mkdir -p -- "$TRAVEL_LINKS_DIR"
             local ldir_mp="$(df "$TRAVEL_LINKS_DIR" | awk '{if(NR==2){print $6}}')"
@@ -472,10 +495,10 @@ fn_time_travel() {
             fi
         done
         if [ "$GIT_action" != "" ]; then
-            fn_log_info "TRAVEL_GIT_REPO  ${YELLOW}$TRAVEL_GIT_REPO${COFF} is ready."
+            fn_log_info_hl "${YELLOW}" "TRAVEL_GIT_REPO %b is ready." "$TRAVEL_GIT_REPO"
         fi
         if [ "$LDIR_action" != "" ]; then
-            fn_log_info "TRAVEL_LINKS_DIR ${YELLOW}$TRAVEL_LINKS_DIR${COFF} is ready."
+            fn_log_info_hl "${YELLOW}" "TRAVEL_LINKS_DIR %b is ready." "$TRAVEL_LINKS_DIR"
         fi
     else
         local i=1
@@ -496,7 +519,7 @@ SSH_SRC_FOLDER=""
 SSH_DEST_FOLDER_PREFIX=""
 SSH_SRC_FOLDER_PREFIX=""
 SSH_BIN="ssh"
-SSH_FLAGS="-o ServerAliveInterval=60"
+SSH_FLAGS=""
 SSH_CMD=""
 
 SRC_FOLDER=""
@@ -590,7 +613,7 @@ while :; do
             break
             ;;
         -*)
-            fn_log_error "Unknown option: \"$1\""
+            fn_log_error "Unknown option: '%s'" "$1"
             fn_display_usage
             exit 1
             ;;
@@ -655,7 +678,7 @@ fi
 
 # Exit if source folder does not exist.
 if ! fn_test_file_exists_src "${SRC_FOLDER}"; then
-    fn_log_error "Source folder \"${SRC_FOLDER}\" does not exist - aborting."
+    fn_log_error "Source folder '%s' does not exist - aborting." "${SRC_FOLDER}"
     exit 1
 fi
 
@@ -675,9 +698,9 @@ done
 # TODO: check that the destination supports hard links
 if [ -z "$(fn_find_backup_marker "$DEST_FOLDER")" ]; then
     fn_log_info "Safety check failed - the destination does not appear to be a backup folder or drive (marker file not found)."
-    fn_log_info "If it is indeed a backup folder, you may add the marker file by running the following command:"
+    fn_log_info "If it is indeed a backup folder, you may add the marker file by using option '--init':"
     fn_log_info ""
-    fn_log_info_cmd "mkdir -p -- \"$DEST_FOLDER\" ; touch \"$(fn_backup_marker_path "$DEST_FOLDER")\""
+    fn_log_info_hl "" "$0 --init '%s'" "$DEST_FOLDER"
     fn_log_info ""
     exit 1
 fi
@@ -716,7 +739,7 @@ MYPID="$$"
 # Create log folder if it doesn't exist
 # ---------------------------------------------------------------------------
 if [ ! -d "$LOG_DIR" ]; then
-    fn_log_info "Creating log folder in '$LOG_DIR'..."
+    fn_log_info "Creating log folder in '%s'..." "$LOG_DIR"
     mkdir -- "$LOG_DIR"
 fi
 
@@ -733,7 +756,7 @@ if [ -n "$(fn_find "$INPROGRESS_FILE")" ]; then
         GREPCODE=$?
         # 4. if found, assume backup is still running
         if [ "$GREPCODE" = 0 ]; then
-            fn_log_error "Previous backup task is still active - aborting (command: $RUNNINGCMD)."
+            fn_log_error "Previous backup task is still active - aborting (command: %s)." "$RUNNINGCMD"
             exit 1
         fi
     elif [[ "$OSTYPE" == "netbsd"* ]]; then
@@ -753,7 +776,9 @@ if [ -n "$(fn_find "$INPROGRESS_FILE")" ]; then
     if [ -n "$PREVIOUS_DEST" ]; then
         # - Last backup is moved to current backup folder so that it can be resumed.
         # - 2nd to last backup becomes last backup.
-        fn_log_info "$SSH_DEST_FOLDER_PREFIX$INPROGRESS_FILE already exists - the previous backup failed or was interrupted. Backup will resume from there."
+        fn_log_info_hl "" "%s exists - the previous backup failed or was interrupted." \
+            "$SSH_DEST_FOLDER_PREFIX$INPROGRESS_FILE"
+        fn_log_info_hl "" "Backup will resume from %s." "$PREVIOUS_DEST"
         fn_run_cmd "mv -- $PREVIOUS_DEST $DEST"
         if [ "$(fn_find_backups | wc -l)" -gt 1 ]; then
             PREVIOUS_DEST="$(fn_find_backups | sed -n '2p')"
@@ -777,7 +802,8 @@ while : ; do
         # If the path is relative, it needs to be relative to the destination. To keep
         # it simple, just use an absolute path. See http://serverfault.com/a/210058/118679
         PREVIOUS_DEST="$(fn_get_absolute_path "$PREVIOUS_DEST")"
-        fn_log_info "Previous backup found - doing incremental backup from $SSH_DEST_FOLDER_PREFIX$PREVIOUS_DEST"
+        fn_log_info "Previous backup found - doing incremental backup from %s" \
+            "$SSH_DEST_FOLDER_PREFIX$PREVIOUS_DEST"
         LINK_DEST_OPTION="--link-dest='$PREVIOUS_DEST'"
     fi
 
@@ -797,7 +823,7 @@ while : ; do
     # -----------------------------------------------------------------------
     # Create destination folder if it doesn't already exists
     if [ -z "$(fn_find "$DEST -type d" 2>/dev/null)" ]; then
-        fn_log_info "Creating destination $SSH_DEST_FOLDER_PREFIX$DEST"
+        fn_log_info "Creating destination %s" "$SSH_DEST_FOLDER_PREFIX$DEST"
         if ! fn_mkdir "$DEST"; then
             fn_log_error "Failed to create destination!"
             exit 4
@@ -816,8 +842,8 @@ while : ; do
     CMD="$CMD $LINK_DEST_OPTION"
     CMD="$CMD -- '$SSH_SRC_FOLDER_PREFIX$SRC_FOLDER/' '$SSH_DEST_FOLDER_PREFIX$DEST/'"
     fn_log_info "Starting backup ..."
-    fn_log_info "From: $SSH_SRC_FOLDER_PREFIX$SRC_FOLDER/"
-    fn_log_info "To:   $SSH_DEST_FOLDER_PREFIX$DEST/"
+    fn_log_info "From: %s/" "$SSH_SRC_FOLDER_PREFIX$SRC_FOLDER"
+    fn_log_info "To:   %s/" "$SSH_DEST_FOLDER_PREFIX$DEST"
     fn_log_info "Running command:"
     fn_log_info "  $CMD"
     echo
@@ -859,7 +885,7 @@ while : ; do
     elif [ -n "$(grep "rsync:" "$LOG_FILE")" ]; then
         fn_log_warn "Rsync reported a warning, backup failed."
     else
-        fn_log_info_gb "Backup completed without errors."
+        fn_log_info_hl "" "Backup completed without errors."
         EXIT_CODE="0"
     fi
     if [ "$EXIT_CODE" = 0 ]; then
@@ -867,7 +893,8 @@ while : ; do
             rm -f -- "$LOG_FILE"
         fi
     else
-        fn_log_error "Run this command for more details: grep -E 'rsync:|rsync error:' '$LOG_FILE'"
+        fn_log_error "Run this command for more details:"
+        fn_log_info_hl "" "grep -E 'rsync:|rsync error:' '%s'" "$LOG_FILE"
     fi
 
     # -----------------------------------------------------------------------
