@@ -162,7 +162,20 @@ Host    backup.vps
 
 ## other
 
-The original document of `rsync-time-backup` is [below](#Rsync-time-backup).
+* TODO list
+    + btrfs subvolume support. Use grub `rootflags=subvol=<DEST>` easily to boot a full system backup.
+        - `fn_mkdir()` for `DEST_FOLDER` `DEST`
+        - `fn_expire_backup()` for `DEST`
+    + a filter rules lib, each file corresponding to each application
+        - configuration files, important & personal data, etc.
+        - `merge, .`, the-rules-files added in `atb.sh` profile as needed
+    + analysis tools for all backups.
+        - data size
+        - space usage
+        - search files
+        - more
+
+* The original document of `rsync-time-backup` is [below](#Rsync-time-backup).
 The forked version of `rsync-time-backup` is `v1.1.5-41-g7af3df3`. (get by `git describe --long --tags`)
 
 * About the expiration strategy, which backup to keep,

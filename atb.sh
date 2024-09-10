@@ -313,6 +313,7 @@ fn_run_cmd_src() {
 
 fn_find() { fn_run_cmd "find '$1'"  2>/dev/null; }
 fn_get_absolute_path() { fn_run_cmd "cd '$1'; pwd"; }
+# TODO test mkdir -> btrfs subvolume create ? snap?
 fn_mkdir() { fn_run_cmd "mkdir -p -- '$1'"; }
 fn_rm_file() { fn_run_cmd "rm -f -- '$1'"; } # rm a file,symlink - not dir
 fn_rm_dir() { fn_run_cmd "rm -rf -- '$1'"; }
@@ -721,7 +722,7 @@ if [ -z "$(fn_find_backup_marker "$DEST_FOLDER")" ]; then
     fn_log_info "Safety check failed - the destination does not appear to be a backup folder or drive (marker file not found)."
     fn_log_info "If it is indeed a backup folder, you may add the marker file by using option '--init':"
     fn_log_info ""
-    fn_log_info_hl "" "$0 --init '%s'" "$DEST_FOLDER"
+    fn_log_info_hl "" "$(basename "$0") --init '%s'" "$DEST_FOLDER"
     fn_log_info ""
     exit 1
 fi
