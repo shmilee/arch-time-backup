@@ -9,6 +9,7 @@ It is modified to support some new features and mainly used to back up my Arch L
 
 * Support to read a backup profile (configfile), like [rtb-wrapper](https://github.com/thomas-mc-work/rtb-wrapper).
   The profile is used to set these options and parameters of `atb.sh`, such as:
+    + `BACKUP_MODE` of backup: `Time-Backup`(default) or `Duplicate-Backup`
     + `SOURCE_DIR` of backup
     + `DESTINATION` of backup
     + (optional) the binary of ssh and rsync
@@ -49,6 +50,7 @@ It is modified to support some new features and mainly used to back up my Arch L
   A `GIT_REPO_DIR` or `LINKS_DIR` can be set to compare different versions of the specific file and view its history.
 
 * Add option `--duplicate` to duplicate a `level=i` backup to a `level=i+1` backup.
+  This is referred to as the "Duplicate-Backup" mode.
   Both `SOURCE_DIR` and `DESTINATION` should be `atb.sh` backup folders.
   They should have the same backup `name`. And the `DESTINATION` level read from
   `backup.marker` must be 1 greater than the `SOURCE_DIR` level.
@@ -61,9 +63,9 @@ Usage: atb.sh [OPTION]... <[USER@HOST:]SOURCE_DIR> <[USER@HOST:]DESTINATION>
 Options:
   -p, --profile </local/path/to/profile>
                         Specify a backup profile. The profile can be used to set
-                        SOURCE_DIR, DESTINATION, the binary of ssh and rsync,
-                        the flags of ssh and rsync, expiration strategy,
-                        auto-expire and filter rules for backup files.
+                        BACKUP_MODE, SOURCE_DIR, DESTINATION, the binary and flags
+                        of ssh and rsync, expiration strategy, auto-expire
+                        and filter rules for backup files.
   --ssh-get-flags       Display the default SSH flags that are used for backup and exit.
   --ssh-set-flags       Set the SSH flags that are used for backup.
   --ssh-append-flags    Append the SSH flags that are going to be used for backup.
@@ -93,6 +95,7 @@ Options:
                         Create links for all versions of the specific file in a directory.
   --duplicate <[USER@HOST:]SOURCE_DIR-as-level=i> <[USER@HOST:]DESTINATION-as-level=i+1>
                         Duplicate a level=i backup to a level=i+1 backup and exit.
+                        The SOURCE_DIR is treated as the level=i backup.
   -h, --help            Display this help message and exit.
 ```
 
@@ -166,6 +169,17 @@ Host    backup.vps
 [atb] Found 7 versions of the specific file.
 [atb] TRAVEL_GIT_REPO  /media/BackArch/time-link/tig-12 is ready.
 [atb] TRAVEL_LINKS_DIR /media/BackArch/time-link/links-12 is ready.
+```
+
+
+* "Duplicate-Backup" mode
+
+```
+[$] atb.sh --duplicate /mnt/backup_drive-1 /mnt/backup_drive-2
+[$] atb.sh --duplicate /mnt/backup_drive-2 user@remote:/data/backup_drive-3
+[$] grep BACKUP_MODE= ./atb-duplicate-example.prf
+BACKUP_MODE="Duplicate-Backup"
+[$] atb.sh -p ./atb-duplicate-example.prf
 ```
 
 ## other

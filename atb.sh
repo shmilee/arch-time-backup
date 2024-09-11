@@ -93,9 +93,9 @@ fn_display_usage() {
     Options:
       -p, --profile </local/path/to/profile>
                             Specify a backup profile. The profile can be used to set
-                            SOURCE_DIR, DESTINATION, the binary of ssh and rsync,
-                            the flags of ssh and rsync, expiration strategy,
-                            auto-expire and filter rules for backup files.
+                            BACKUP_MODE, SOURCE_DIR, DESTINATION, the binary and flags
+                            of ssh and rsync, expiration strategy, auto-expire
+                            and filter rules for backup files.
       --ssh-get-flags       Display the default SSH flags that are used for backup and exit.
       --ssh-set-flags       Set the SSH flags that are used for backup.
       --ssh-append-flags    Append the SSH flags that are going to be used for backup.
@@ -125,6 +125,7 @@ fn_display_usage() {
                             Create links for all versions of the specific file in a directory.
       --duplicate <[USER@HOST:]SOURCE_DIR-as-level=i> <[USER@HOST:]DESTINATION-as-level=i+1>
                             Duplicate a level=i backup to a level=i+1 backup and exit.
+                            The SOURCE_DIR is treated as the level=i backup.
       -h, --help            Display this help message and exit.
 
     For more detailed help, please see the README file:
@@ -276,6 +277,12 @@ fn_parse_profile() {
     SRC_FOLDER="${SOURCE_DIR}"
     DEST_FOLDER="${DESTINATION}"
     unset SOURCE_DIR DESTINATION
+    if [ "$BACKUP_MODE" = "Duplicate-Backup" ]; then
+        ACTION="duplicate"
+    else
+        ACTION="backup"
+        BACKUP_MODE="Time-Backup"
+    fi
     #SSH_BIN, RSYNC_BIN
     #SSH_FLAGS, RSYNC_FLAGS,
     #EXPIRATION_STRATEGY, AUTO_EXPIRE
@@ -550,38 +557,6 @@ fn_time_travel() {
 }
 
 # ---------------------------------------------------------------------------
-# Show information, source, destination, etc.
-# ---------------------------------------------------------------------------
-fn_show_backup_info() {
-    fn_log_info "Backup Information:"
-    cat <<EOF
-
-  SOURCE_DIR   = ${SSH_SRC_FOLDER_PREFIX}${SRC_FOLDER}/
-  DESTINATION  = ${SSH_DEST_FOLDER_PREFIX}${DEST_FOLDER}/
-  FILTER_RULES = ${FILTER_RULES}
-  SSH_FLAGS    = ${SSH_FLAGS}
-  RSYNC_FLAGS  = ${RSYNC_FLAGS}
-  AUTO_EXPIRE  = ${AUTO_EXPIRE}
-  EXPIRATION_STRATEGY  = ${EXPIRATION_STRATEGY}
-
-EOF
-}
-
-fn_show_duplicate_info() {
-    fn_log_info "Duplicate Information:"
-    cat <<EOF
-
-  BACKUP_NAME  = ${BACKUP_NAME}
-  BACKUP_LEVEL = ${DUP_SRC_LEVEL} -> ${DUP_DEST_LEVEL}
-  SOURCE_DIR   = ${SSH_SRC_FOLDER_PREFIX}${SRC_FOLDER}/
-  DESTINATION  = ${SSH_DEST_FOLDER_PREFIX}${DEST_FOLDER}/
-  SSH_FLAGS    = ${SSH_FLAGS}
-  RSYNC_FLAGS  = ${RSYNC_FLAGS}
-
-EOF
-}
-
-# ---------------------------------------------------------------------------
 # Check SRC_FOLDER DEST_FOLDER, also ssh rsync cmd file, log folder
 # ---------------------------------------------------------------------------
 fn_check_SRC_DEST() {
@@ -638,7 +613,7 @@ fn_check_SRC_DEST() {
         fn_log_info "Safety check failed - the destination does not appear to be a backup folder or drive (marker file not found)."
         fn_log_info "If it is indeed a backup folder, you may add the marker file by using option '--init':"
         fn_log_info ""
-        fn_log_info_hl "" "$(basename "$0") --init '%s'" "$DEST_FOLDER"
+        fn_log_info_hl "" "$(basename "$0") --init '%s'" "$DEST_FOLDER/"
         fn_log_info ""
         exit 1
     fi
@@ -657,6 +632,25 @@ fn_check_SRC_DEST() {
         fn_log_info "Using the --modify-window rsync parameter with value 2."
         RSYNC_FLAGS="${RSYNC_FLAGS} --modify-window=2"
     fi
+}
+
+# ---------------------------------------------------------------------------
+# Show information, source, destination, etc.
+# ---------------------------------------------------------------------------
+fn_show_backup_info() {
+    fn_log_info "Running in $BACKUP_MODE mode."
+    fn_log_info "Backup Information:"
+    cat <<EOF
+
+  SOURCE_DIR   = ${SSH_SRC_FOLDER_PREFIX}${SRC_FOLDER}/
+  DESTINATION  = ${SSH_DEST_FOLDER_PREFIX}${DEST_FOLDER}/
+  FILTER_RULES = ${FILTER_RULES}
+  SSH_FLAGS    = ${SSH_FLAGS}
+  RSYNC_FLAGS  = ${RSYNC_FLAGS}
+  AUTO_EXPIRE  = ${AUTO_EXPIRE}
+  EXPIRATION_STRATEGY  = ${EXPIRATION_STRATEGY}
+
+EOF
 }
 
 # ---------------------------------------------------------------------------
@@ -724,10 +718,8 @@ fn_expire_old_backups() {
     fi
 }
 
-fn_get_rsync_backup_CMD() {
-    # -----------------------------------------------------------------------
+fn_set_rsync_backup_CMD() {
     # Check if we are doing an incremental backup (if previous backup exists).
-    # -----------------------------------------------------------------------
     local LINK_DEST_OPTION=""
     if [ -z "$PREVIOUS_DEST" ]; then
         fn_log_info "No previous backup - creating new one."
@@ -742,8 +734,7 @@ fn_get_rsync_backup_CMD() {
 
     CMD="$RSYNC_BIN $RSYNC_FLAGS --log-file '$RSYNC_LOG_FILE'"
     if [ -n "$SSH_CMD" ]; then
-        RSYNC_FLAGS="$RSYNC_FLAGS --compress"
-        CMD="$CMD -e '$SSH_BIN $SSH_FLAGS'"
+        CMD="$CMD --compress -e '$SSH_BIN $SSH_FLAGS'"
     fi
     if [ -f "$FILTER_RULES" ]; then
         CMD="$CMD --filter='merge $FILTER_RULES'"
@@ -758,10 +749,33 @@ fn_get_rsync_backup_CMD() {
     echo
 }
 
+# -----------------------------------------------------------------------
+# Check whether rsync reported any errors
+# -----------------------------------------------------------------------
+fn_check_rsync_log() {
+    local CMD_RETURNCODE=$1
+    if [ -n "$(grep "rsync error:" "$RSYNC_LOG_FILE")" ]; then
+        fn_log_error "Rsync reported an error, $ACTION failed."
+    elif [ $CMD_RETURNCODE -ne 0 ]; then
+        fn_log_error "Rsync returned non-zero return code, $ACTION failed."
+    elif [ -n "$(grep "rsync:" "$RSYNC_LOG_FILE")" ]; then
+        fn_log_warn "Rsync reported a warning, $ACTION failed."
+    else
+        fn_log_info_hl "" "${ACTION^} completed without errors."
+        if [[ $AUTO_DELETE_LOG == "1" ]]; then
+            rm -f -- "$RSYNC_LOG_FILE"
+        fi
+        return 0
+    fi
+    fn_log_error "Run this command for more details:"
+    fn_log_info_hl "" "grep -E 'rsync:|rsync error:' '%s'" "$RSYNC_LOG_FILE"
+    return 1
+}
+
+# -----------------------------------------------------------------------
+# Start backup action
+# -----------------------------------------------------------------------
 fn_action_backup() {
-    # -----------------------------------------------------------------------
-    # Start backup
-    # -----------------------------------------------------------------------
     # Create destination folder if it doesn't already exists
     if [ -z "$(fn_find "$DEST -type d" 2>/dev/null)" ]; then
         fn_log_info "Creating destination %s" "$SSH_DEST_FOLDER_PREFIX$DEST"
@@ -772,16 +786,14 @@ fn_action_backup() {
     fi
 
     fn_run_cmd "echo $MYPID > $INPROGRESS_FILE"
-    fn_get_rsync_backup_CMD
+    fn_set_rsync_backup_CMD
     eval $CMD
     local CMD_RETURNCODE=$?
     if [ -f "$FILTER_RULES" ]; then
         rm -f -- "$FILTER_RULES"
     fi
 
-    # -----------------------------------------------------------------------
     # Check if we ran out of space
-    # -----------------------------------------------------------------------
     local NO_SPACE_LEFT="$(grep "No space left on device (28)\|Result too large (34)" "$RSYNC_LOG_FILE")"
     if [ -n "$NO_SPACE_LEFT" ]; then
         if [[ $AUTO_EXPIRE == "0" ]]; then
@@ -798,46 +810,117 @@ fn_action_backup() {
         return
     fi
 
-    # -----------------------------------------------------------------------
-    # Check whether rsync reported any errors
-    # -----------------------------------------------------------------------
-    local EXIT_CODE="1"
-    if [ -n "$(grep "rsync error:" "$RSYNC_LOG_FILE")" ]; then
-        fn_log_error "Rsync reported an error, backup failed."
-    elif [ $CMD_RETURNCODE -ne 0 ]; then
-        fn_log_error "Rsync returned non-zero return code, backup failed."
-    elif [ -n "$(grep "rsync:" "$RSYNC_LOG_FILE")" ]; then
-        fn_log_warn "Rsync reported a warning, backup failed."
-    else
-        fn_log_info_hl "" "Backup completed without errors."
-        EXIT_CODE="0"
-    fi
-    if [ "$EXIT_CODE" = 0 ]; then
-        if [[ $AUTO_DELETE_LOG == "1" ]]; then
-            rm -f -- "$RSYNC_LOG_FILE"
-        fi
-    else
-        fn_log_error "Run this command for more details:"
-        fn_log_info_hl "" "grep -E 'rsync:|rsync error:' '%s'" "$RSYNC_LOG_FILE"
-    fi
-
-    # -----------------------------------------------------------------------
     # Add symlink to last backup
-    # -----------------------------------------------------------------------
-    if [ "$EXIT_CODE" = 0 ]; then
+    if fn_check_rsync_log $CMD_RETURNCODE; then
         # Create the latest symlink only when rsync succeeded
         fn_rm_file "$DEST_FOLDER/latest"
         fn_ln "$(basename -- "$DEST")" "$DEST_FOLDER/latest"
         # Remove .inprogress file only when rsync succeeded
         fn_rm_file "$INPROGRESS_FILE"
+        exit
     fi
-
-    exit $EXIT_CODE
+    exit 1
 }
 
+# ---------------------------------------------------------------------------
+# Check and show duplicate info of SRC_FOLDER DEST_FOLDER
+# ---------------------------------------------------------------------------
+fn_read_marker() {
+    local ssh_prefix="$1" marker="$2"
+    if [ -n "$ssh_prefix" ]; then
+        $SSH_CMD "cat '$marker'"
+    else
+        cat "$marker"
+    fi
+}
 
+fn_check_show_duplicate_info() {
+    local marksrc="$(fn_backup_marker_path "$SRC_FOLDER")"
+    local markdest="$(fn_backup_marker_path "$DEST_FOLDER")"
+    fn_log_info "Running in $BACKUP_MODE mode."
+
+    # Check that the source drive also is a backup drive
+    if [ -z "$(fn_run_cmd_src "find '$marksrc'"  2>/dev/null)" ]; then
+        fn_log_info "Safety check failed - the source does not appear to be a backup folder or drive (marker file not found)."
+        fn_log_info "If it is indeed a backup folder, you may add the marker file by using option '--init':"
+        fn_log_info ""
+        fn_log_info_hl "" "$(basename "$0") --init '%s'" "$SRC_FOLDER/"
+        fn_log_info ""
+        exit 1
+    fi
+
+    # check name, level in marker file
+    marksrc=$(fn_read_marker "$SSH_SRC_FOLDER_PREFIX" "$marksrc")
+    markdest=$(fn_read_marker "$SSH_DEST_FOLDER_PREFIX" "$markdest")
+    local name1=$(echo "$marksrc" | awk -F'=' '/^name=/{print $2;exit}')
+    local level1=$(echo "$marksrc" | awk -F'=' '/^level=/{print $2;exit}')
+    local name2=$(echo "$markdest" | awk -F'=' '/^name=/{print $2;exit}')
+    local level2=$(echo "$markdest" | awk -F'=' '/^level=/{print $2;exit}')
+    if [ -z "$name1" -o "$name1" != "$name2" ]; then
+        fn_log_error "The backup names of SRC_FOLDER and DEST_FOLDER are different!"
+        fn_log_error " -> SRC_FOLDER(name=$name1) vs DEST_FOLDER(name=$name2)"
+        exit 5
+    fi
+    if [ "$level1" != "$((level2-1))" ]; then
+        fn_log_error "The backup level of DEST_FOLDER must be 1 greater than that of SRC_FOLDER!"
+        fn_log_error " -> SRC_FOLDER(level=$level1) vs DEST_FOLDER(level=$level2)"
+        exit 5
+    fi
+    fn_log_info "Duplicate Information:"
+    cat <<EOF
+
+  BACKUP_NAME  = ${name1}
+  BACKUP_LEVEL = ${level1} -> ${level2}
+  SOURCE_DIR   = ${SSH_SRC_FOLDER_PREFIX}${SRC_FOLDER}/
+  DESTINATION  = ${SSH_DEST_FOLDER_PREFIX}${DEST_FOLDER}/
+  SSH_FLAGS    = ${SSH_FLAGS}
+  RSYNC_FLAGS  = ${RSYNC_FLAGS}
+
+EOF
+}
+
+fn_set_rsync_duplicate_CMD() {
+    if ! echo $RSYNC_FLAGS | grep -q 'hard-links'; then
+        fn_log_warn " Add option '--hard-links' for rsync, as $BACKUP_MODE mode requires it!"
+        RSYNC_FLAGS="$RSYNC_FLAGS --hard-links"
+    fi
+
+    CMD="$RSYNC_BIN $RSYNC_FLAGS --log-file '$RSYNC_LOG_FILE'"
+    if [ -n "$SSH_CMD" ]; then
+        CMD="$CMD --compress -e '$SSH_BIN $SSH_FLAGS'"
+    fi
+    CMD="$CMD --exclude='backup.marker' -- '$SSH_SRC_FOLDER_PREFIX$SRC_FOLDER/' '$SSH_DEST_FOLDER_PREFIX$DEST_FOLDER/'"
+    fn_log_info "Starting duplicate-backup..."
+    fn_log_info "From: %s/" "$SSH_SRC_FOLDER_PREFIX$SRC_FOLDER"
+    fn_log_info "To:   %s/" "$SSH_DEST_FOLDER_PREFIX$DEST_FOLDER"
+    fn_log_info "Running command:"
+    fn_log_info "  $CMD"
+    echo
+}
+
+# -----------------------------------------------------------------------
+# Start duplicate action
+# -----------------------------------------------------------------------
 fn_action_duplicate() {
-    :
+    fn_run_cmd "echo $MYPID > $INPROGRESS_FILE"
+    fn_set_rsync_duplicate_CMD
+    eval $CMD
+    local CMD_RETURNCODE=$?
+
+    # Check if we ran out of space
+    local NO_SPACE_LEFT="$(grep "No space left on device (28)\|Result too large (34)" "$RSYNC_LOG_FILE")"
+    if [[ $AUTO_EXPIRE == "0" ]]; then
+        fn_log_error "No space left on device: %s" "$DEST_FOLDER"
+        fn_log_error "Please switch to a device with enough space."
+        exit 5
+    fi
+
+    # Remove duplicate.inprogress file only when rsync succeeded
+    if fn_check_rsync_log $CMD_RETURNCODE; then
+        fn_rm_file "$INPROGRESS_FILE"
+        exit
+    fi
+    exit 1
 }
 
 # ---------------------------------------------------------------------------
@@ -871,6 +954,7 @@ TRAVEL_GIT_REPO=""
 TRAVEL_LINKS_DIR=""
 
 ACTION="backup"  # backup, initialize, travel, duplicate
+BACKUP_MODE="Time-Backup"  # Time-Backup or Duplicate-Backup
 
 while :; do
     case $1 in
@@ -924,7 +1008,6 @@ while :; do
             AUTO_DELETE_LOG="0"
             ;;
         --no-color)
-            shift
             fn_no_color
             ;;
         --init)
@@ -946,8 +1029,8 @@ while :; do
             TRAVEL_LINKS_DIR="$(realpath "$1")"
             ;;
         --duplicate)
-            shift
             ACTION="duplicate"
+            BACKUP_MODE="Duplicate-Backup"
             ;;
         --)
             shift
@@ -988,12 +1071,13 @@ elif [ "$ACTION" = "travel" ]; then
 elif [ "$ACTION" = "duplicate" ]; then
     # duplicate SRC_FOLDER -> DEST_FOLDER
     fn_check_SRC_DEST
-    BACKUP_NAME="" #TODO
-    DUP_SRC_LEVEL="1"
-    DUP_DEST_LEVEL="2"
-    fn_show_duplicate_info
-    # Setup additional variables?
-    exit
+    fn_check_show_duplicate_info
+    # Setup additional variables
+    INPROGRESS_FILE="$DEST_FOLDER/duplicate.inprogress"
+    if [ -n "$(fn_find "$INPROGRESS_FILE")" ]; then
+        check_inprogress_task "$INPROGRESS_FILE"
+    fi
+    fn_action_duplicate
 else
     # default: time backup
     fn_check_SRC_DEST

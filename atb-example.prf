@@ -1,5 +1,11 @@
 ## Example Profile for arch-time-backup atb.sh
 
+## Backup mode: Time-Backup or Duplicate-Backup. Default: Time-Backup
+##  1) Time-Backup, is Time Machine style.
+##  2) Duplicate-Backup, to create a duplicate backup of Time-Backup folder
+##     In this mode, settings of EXPIRATION, FILTER_RULES are ignored.
+BACKUP_MODE="Time-Backup"
+
 ## Set source, destination folder path
 ## If this profile is in the SOURCE_DIR folder, the SOURCE_DIR can be set as
 ##     SOURCE_DIR="$(dirname $(realpath $1))"
