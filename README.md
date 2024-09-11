@@ -42,7 +42,7 @@ It is modified to support some new features and mainly used to back up my Arch L
   Option `--no-color` is added to disable this.
 
 * Add option `--init` to initialize a new `DESTINATION`.
-  Write some information to the `backup.marker` file, such as then backup `name` and `level`.
+  Write some information to the `backup.marker` file, such as the backup `name` and `level`.
 
 * Add option `-t, --time-travel` to list all versions of a specific file.
   Inspired by [rsync-time-browse](https://github.com/uglygus/rsync-time-browse),
