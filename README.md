@@ -97,6 +97,7 @@ Options:
                         Duplicate a level=i backup to a level=i+1 backup and exit.
                         The SOURCE_DIR is treated as the level=i backup.
   -h, --help            Display this help message and exit.
+  -V, --version         Print atb version and exit.
 ```
 
 * Initialize DESTINATION

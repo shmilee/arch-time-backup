@@ -4,7 +4,7 @@
 # License: MIT
 
 APPNAME=$(basename "$0" | sed "s/\.sh$//")
-APPVERSION="2.0.0"
+APPVERSION="2.1.0"
 MYPID="$$"
 
 # ---------------------------------------------------------------------------
@@ -127,6 +127,7 @@ fn_display_usage() {
                             Duplicate a level=i backup to a level=i+1 backup and exit.
                             The SOURCE_DIR is treated as the level=i backup.
       -h, --help            Display this help message and exit.
+      -V, --version         Print $APPNAME version and exit.
 
     For more detailed help, please see the README file:
     https://github.com/shmilee/arch-time-backup/blob/master/README.md
@@ -963,6 +964,12 @@ while :; do
     case $1 in
         -h|--help)
             fn_display_usage
+            exit
+            ;;
+        -V|--version)
+            printf "%s version %s\n" "$APPNAME" "$APPVERSION"
+            printf "Copyright (c) 2024 shmilee\n"
+            printf "Copyright (c) 2013-2024 Laurent Cozic\n"
             exit
             ;;
         -p|--profile)
