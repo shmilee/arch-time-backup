@@ -1,16 +1,16 @@
 ## Example Profile for arch-time-backup atb.sh
 
 ## Set source, destination folder path
-## If this profile is in the SOURCE folder, the SOURCE can be set as
-##     SOURCE="$(dirname $(realpath $1))"
-SOURCE="/"
+## If this profile is in the SOURCE_DIR folder, the SOURCE_DIR can be set as
+##     SOURCE_DIR="$(dirname $(realpath $1))"
+SOURCE_DIR="/"
 DESTINATION="/media/BackArch/atb-slim-backup"
 
 ## Set SSH Rsync command binary. Default: ssh, rsync
 #SSH_BIN="ssh"
 #RSYNC_BIN="rsync"
 
-## Set ssh flags for SOURCE or DESTINATION, like atb.sh --ssh-set-flags.
+## Set ssh flags for SOURCE_DIR or DESTINATION, like atb.sh --ssh-set-flags.
 ## Default: Use atb.sh --ssh-get-flags to show the Default flags.
 #SSH_FLAGS="-p22 -i ${HOME}/.ssh/id_rsa"
 #SSH_FLAGS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
