@@ -166,6 +166,9 @@ Host    backup.vps
     + btrfs subvolume support. Use grub `rootflags=subvol=<DEST>` easily to boot a full system backup.
         - `fn_mkdir()` for `DEST_FOLDER` `DEST`
         - `fn_expire_backup()` for `DEST`
+    + `--init`, add some info in `backup.marker`
+        - backup levels: `1,2,3,...`, create a backup-2 of backup-1, and go on
+        - backup name: can sync backup-A, backup-B if they have same name
     + a filter rules lib, each file corresponding to each application
         - configuration files, important & personal data, etc.
         - `merge, .`, the-rules-files added in `atb.sh` profile as needed
