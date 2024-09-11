@@ -313,7 +313,6 @@ fn_run_cmd_src() {
 
 fn_find() { fn_run_cmd "find '$1'"  2>/dev/null; }
 fn_get_absolute_path() { fn_run_cmd "cd '$1'; pwd"; }
-# TODO test mkdir -> btrfs subvolume create ? snap?
 fn_mkdir() { fn_run_cmd "mkdir -p -- '$1'"; }
 fn_rm_file() { fn_run_cmd "rm -f -- '$1'"; } # rm a file,symlink - not dir
 fn_rm_dir() { fn_run_cmd "rm -rf -- '$1'"; }

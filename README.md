@@ -163,9 +163,6 @@ Host    backup.vps
 ## other
 
 * TODO list
-    + btrfs subvolume support. Use grub `rootflags=subvol=<DEST>` easily to boot a full system backup.
-        - `fn_mkdir()` for `DEST_FOLDER` `DEST`
-        - `fn_expire_backup()` for `DEST`
     + `--init`, add some info in `backup.marker`
         - backup levels: `1,2,3,...`, create a backup-2 of backup-1, and go on
         - backup name: can sync backup-A, backup-B if they have same name
@@ -181,12 +178,22 @@ Host    backup.vps
 * The original document of `rsync-time-backup` is [below](#Rsync-time-backup).
 The forked version of `rsync-time-backup` is `v1.1.5-41-g7af3df3`. (get by `git describe --long --tags`)
 
-* About the expiration strategy, which backup to keep,
-  check function `fn_expire_backups()` and var `oldest_backup_to_keep` in `atb.sh`.
+* About the expiration strategy, which backup to keep.
+  Check function `fn_expire_backups()` and var `oldest_backup_to_keep` in `atb.sh`.
   The `1:1 30:7 365:30` means:
     - After **1** day, keep one oldest backup every **1** day (**1:1**).
     - After **30** days, keep one oldest backup every **7** days (**30:7**).
     - After **365** days, keep one oldest backup every **30** days (**365:30**).
+
+* About full system backups on btrfs filesystem.
+  A subvolume can be created from one backup and used as the root mountpoint.
+  See [stackexchange](https://unix.stackexchange.com/questions/628060) and
+  [btrfs.wiki](https://archive.kernel.org/oldwiki/btrfs.wiki.kernel.org/index.php/UseCases.html#Can_I_take_a_snapshot_of_a_directory.3F).
+  ```
+  btrfs subvolume create /path/to/dest-subvolume
+  cp -ax --reflink=always /path/to/a/selected/backup/. /path/to/dest-subvolume
+  #kernel parameter in grub.cfg, rootflags=subvol=/path/to/dest-subvolume
+  ```
 
 
 # Rsync time backup
