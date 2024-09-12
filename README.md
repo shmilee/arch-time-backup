@@ -1,4 +1,4 @@
-# Arch time backup
+# Arch Time Backup
 
 Arch time backup script is a fork of [rsync-time-backup](https://github.com/laurent22/rsync-time-backup),
 renamed from `rsync_tmbackup.sh` to `atb.sh`,
@@ -50,7 +50,7 @@ It is modified to support some new features and mainly used to back up my Arch L
   A `GIT_REPO_DIR` or `LINKS_DIR` can be set to compare different versions of the specific file and view its history.
 
 * Add option `--duplicate` to duplicate a `level=i` backup to a `level=i+1` backup.
-  This is referred to as the "Duplicate-Backup" mode.
+  This is referred to as the "`Duplicate-Backup`" mode.
   Both `SOURCE_DIR` and `DESTINATION` should be `atb.sh` backup folders.
   They should have the same backup `name`. And the `DESTINATION` level read from
   `backup.marker` must be 1 greater than the `SOURCE_DIR` level.
@@ -172,8 +172,7 @@ Host    backup.vps
 [atb] TRAVEL_LINKS_DIR /media/BackArch/time-link/links-12 is ready.
 ```
 
-
-* "Duplicate-Backup" mode
+* "`Duplicate-Backup`" mode
 
 ```
 [$] atb.sh --duplicate /mnt/backup_drive-1 /mnt/backup_drive-2
@@ -182,6 +181,84 @@ Host    backup.vps
 BACKUP_MODE="Duplicate-Backup"
 [$] atb.sh -p ./atb-duplicate-example.prf
 ```
+
+* About full system backups on btrfs filesystem.
+  A subvolume can be created from one backup and used as the root mountpoint.
+  See [stackexchange](https://unix.stackexchange.com/questions/628060) and
+  [btrfs.wiki](https://archive.kernel.org/oldwiki/btrfs.wiki.kernel.org/index.php/UseCases.html#Can_I_take_a_snapshot_of_a_directory.3F).
+  ```
+  btrfs subvolume create /path/to/dest-subvolume
+  cp -ax --reflink=always /path/to/a/selected/backup/. /path/to/dest-subvolume
+  #kernel parameter in grub.cfg, rootflags=subvol=/path/to/dest-subvolume
+  ```
+
+* ~~Create a "`Time-Backup`" DESTINATION, started from a btrfs readonly snapshot.
+  Hard-link between btrfs snapshot and DESTINATION, this can not reduce space usage
+  and will give you `Invalid cross-device link` error.~~
+  - [Rsync not support reflinks](https://www.reddit.com/r/btrfs/comments/ijby0b/does_rsync_support_reflinks_for_btrfs/)
+  - [rsync no --reflink-dest option](https://github.com/RsyncProject/rsync/issues/153)
+
+### An actual use case
+
+Create a "`Time-Backup`" DESTINATION, started with a fresh backup made by btrfs **reflink**.
+When the `SOURCE_DIR` and `DESTINATION` are in the same btrfs partition,
+the original version made by **reflink** reduces space usage.
+And it also allows you to charge the `SOURCE_DIR` files while ensuring that
+the files in the `DESTINATION` original version remain unchanged.
+Take this backup as the First-Level (Level-1) Backup.
+Then we can use the First-Level Backup to make Level-2 Backup.
+Examples in `./atb-ifts_study-backup.prf` and `atb-ifts_study-backup-level-2.prf`.
+
+* **First-Level Time-Backup**
+
+```
+[$] SOURCE_DIR="/media/Data/ifts_study"
+[$] DESTINATION="/media/Data/atb-ifts_study-backup"
+[$] Original="$DESTINATION/$(date +"%Y-%m-%d-%H%M%S")"
+[$] atb.sh --init "$DESTINATION"
+# Don't forget to append the '/.' after the SOURCE_DIR
+[$] cp -ax --reflink=always "$SOURCE_DIR/." "$Original"
+[$] atb.sh -p ./atb-ifts_study-backup.prf
+```
+
+```
+[$] df | grep /media/Data
+/dev/sda4       360G  192G  168G   54% /media/Data
+
+[$] du -h -d1 /media/Data
+102G   /media/Data/ifts_study
+90G    /media/Data/others....
+102G   /media/Data/atb-ifts_study-backup
+293G   /media/Data
+293G   total
+
+[$] du -h -d1 /media/Data/atb-ifts_study-backup
+102G   /media/Data/atb-ifts_study-backup/2024-09-12-113040
+4.0K   /media/Data/atb-ifts_study-backup/2024-09-12-114802
+102G   /media/Data/atb-ifts_study-backup
+102G   total
+```
+
+* **Level-2 Duplicate-Backup**
+
+```
+#SOURCE_DIR="/media/Data/atb-ifts_study-backup"
+#DESTINATION="/media/GTC-DATA/atb-ifts_study-backup-level-2"
+[$] atb.sh --init /media/GTC-DATA/atb-ifts_study-backup
+[$] sed -i 's/level=1/level=2/' /media/GTC-DATA/atb-ifts_study-backup/backup.marker
+[$] mv -v /media/GTC-DATA/atb-ifts_study-backup /media/GTC-DATA/atb-ifts_study-backup-level-2
+
+[$] atb.sh -p ./atb-ifts_study-backup-level-2.prf
+[$] du -h -d1 /media/GTC-DATA/atb-ifts_study-backup-level-2
+102G   /media/GTC-DATA/atb-ifts_study-backup-level-2/2024-09-12-113040
+12M    /media/GTC-DATA/atb-ifts_study-backup-level-2/2024-09-12-114802
+102G   /media/GTC-DATA/atb-ifts_study-backup-level-2
+102G   total
+```
+
+Ref:
+- [Reflink doc](https://btrfs.readthedocs.io/en/latest/Reflink.html)
+- [cp --reflink on BTRFS to save space](https://www.reddit.com/r/synology/comments/jupa14/hard_links_vs_cp_reflink_on_btrfs_to_save_space/)
 
 ## other
 
@@ -204,16 +281,6 @@ The forked version of `rsync-time-backup` is `v1.1.5-41-g7af3df3`. (get by `git 
     - After **1** day, keep one oldest backup every **1** day (**1:1**).
     - After **30** days, keep one oldest backup every **7** days (**30:7**).
     - After **365** days, keep one oldest backup every **30** days (**365:30**).
-
-* About full system backups on btrfs filesystem.
-  A subvolume can be created from one backup and used as the root mountpoint.
-  See [stackexchange](https://unix.stackexchange.com/questions/628060) and
-  [btrfs.wiki](https://archive.kernel.org/oldwiki/btrfs.wiki.kernel.org/index.php/UseCases.html#Can_I_take_a_snapshot_of_a_directory.3F).
-  ```
-  btrfs subvolume create /path/to/dest-subvolume
-  cp -ax --reflink=always /path/to/a/selected/backup/. /path/to/dest-subvolume
-  #kernel parameter in grub.cfg, rootflags=subvol=/path/to/dest-subvolume
-  ```
 
 
 # Rsync time backup

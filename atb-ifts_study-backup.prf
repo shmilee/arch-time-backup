@@ -1,0 +1,31 @@
+## Example Profile for arch-time-backup atb.sh
+
+## Backup mode: Time-Backup or Duplicate-Backup. Default: Time-Backup
+##  1) Time-Backup, is Time Machine style.
+##  2) Duplicate-Backup, to create a duplicate backup of Time-Backup folder
+##     In this mode, settings of EXPIRATION, FILTER_RULES are ignored.
+BACKUP_MODE="Time-Backup"
+
+## Set source, destination folder path
+## If this profile is in the SOURCE_DIR folder, the SOURCE_DIR can be set as
+##     SOURCE_DIR="$(dirname $(realpath $1))"
+SOURCE_DIR="/media/Data/ifts_study"
+DESTINATION="/media/Data/atb-ifts_study-backup"
+
+## Set rsync flags to be used for backup, like atb.sh --rsync-set-flags.
+## Default: Use atb.sh --rsync-get-flags to show the Default flags.
+## Some rsync flags:
+##   --one-file-system, avoid crossing filesystem boundaries,
+##                      prevent backing up any mount point in the hierarchy
+##   --compress, compress file data, when over SSH
+##   --info=help, show more FLAGS for --info=FLAGS
+RSYNC_FLAGS="-D --numeric-ids --links --hard-links --itemize-changes --times --recursive --perms --owner --group --stats --human-readable"
+RSYNC_FLAGS="-aAX --info=progress2 ${RSYNC_FLAGS}"
+
+## Set the expiration strategy. Default: "1:1 30:7 365:30"
+#EXPIRATION_STRATEGY="1:1 30:7 365:30"
+
+## When out of space, automatically deleting backups or not. Default: "1"
+##   "0", off, the backup is aborted.
+##   "1", on, removing oldest backup and resuming backup.
+AUTO_EXPIRE="0"
