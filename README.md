@@ -261,6 +261,20 @@ Ref:
 - [Reflink doc](https://btrfs.readthedocs.io/en/latest/Reflink.html)
 - [cp --reflink on BTRFS to save space](https://www.reddit.com/r/synology/comments/jupa14/hard_links_vs_cp_reflink_on_btrfs_to_save_space/)
 
+
+### systemd timers
+
+```
+cp ./systemd-timer/atb@.timer ~/.config/systemd/user/
+cp ./systemd-timer/atb@.service ~/.config/systemd/user/
+
+cp ./atb-ifts_study-backup.prf ~/.atb/atb-ifts_study-backup.prf
+
+systemctl --user enable atb@atb-ifts_study-backup.timer
+systemctl --user start atb@atb-ifts_study-backup.timer
+systemctl --user status atb@atb-ifts_study-backup.{timer,service}
+```
+
 ## other
 
 * TODO list

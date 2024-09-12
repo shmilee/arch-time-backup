@@ -1,0 +1,13 @@
+[Unit]
+Description=Daily arch-time-backup for %i
+Documentation=https://github.com/shmilee/arch-time-backup
+ConditionPathExists=/usr/local/bin/atb.sh
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/atb.sh --strategy-noconfirm -p %i
+
+# https://bbs.archlinux.org/viewtopic.php?id=233035
+# https://unix.stackexchange.com/questions/548499
+# when systemctl --user service, need to remove "User=" line
+#User=xxx

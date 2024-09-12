@@ -1,0 +1,13 @@
+[Unit]
+Description=Daily arch-time-backup for %i
+Documentation=https://github.com/shmilee/arch-time-backup
+ConditionPathExists=/usr/local/bin/atb.sh
+
+[Timer]
+OnCalendar=*-*-* 18:00:00
+AccuracySec=30m
+RandomizedDelaySec=2h
+Persistent=true
+
+[Install]
+WantedBy=timers.target
