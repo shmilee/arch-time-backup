@@ -787,7 +787,7 @@ fn_set_rsync_backup_CMD() {
     fi
     CMD="$CMD $LINK_DEST_OPTION"
     CMD="$CMD -- '$SSH_SRC_FOLDER_PREFIX$SRC_FOLDER/' '$SSH_DEST_FOLDER_PREFIX$DEST/'"
-    fn_log_info "Starting backup..."
+    fn_log_info "Starting Time Backup..."
     fn_log_info "From: %s/" "$SSH_SRC_FOLDER_PREFIX$SRC_FOLDER"
     fn_log_info "To:   %s/" "$SSH_DEST_FOLDER_PREFIX$DEST"
     fn_log_info "Running command:"
@@ -936,7 +936,7 @@ fn_set_rsync_duplicate_CMD() {
         CMD="$CMD --compress -e '$SSH_BIN $SSH_FLAGS'"
     fi
     CMD="$CMD --exclude='backup.marker' -- '$SSH_SRC_FOLDER_PREFIX$SRC_FOLDER/' '$SSH_DEST_FOLDER_PREFIX$DEST_FOLDER/'"
-    fn_log_info "Starting duplicate-backup..."
+    fn_log_info "Starting Duplicate Backup..."
     fn_log_info "From: %s/" "$SSH_SRC_FOLDER_PREFIX$SRC_FOLDER"
     fn_log_info "To:   %s/" "$SSH_DEST_FOLDER_PREFIX$DEST_FOLDER"
     fn_log_info "Running command:"
@@ -955,7 +955,7 @@ fn_action_duplicate() {
 
     # Check if we ran out of space
     local NO_SPACE_LEFT="$(grep "No space left on device (28)\|Result too large (34)" "$RSYNC_LOG_FILE")"
-    if [[ $AUTO_EXPIRE == "0" ]]; then
+    if [ -n "$NO_SPACE_LEFT" ]; then
         fn_log_error "No space left on device: %s" "$DEST_FOLDER"
         fn_log_error "Please switch to a device with enough space."
         exit 5
