@@ -3,9 +3,47 @@
 # Copyright (c) 2013-2024 Laurent Cozic (laurent22)
 # License: MIT
 
+# ---------------------------------------------------------------------------
+# Script information
+# ---------------------------------------------------------------------------
 APPNAME=$(basename "$0" | sed "s/\.sh$//")
 APPVERSION="2.1.0"
 MYPID="$$"
+
+# ---------------------------------------------------------------------------
+# Source and destination information, Options
+# ---------------------------------------------------------------------------
+SSH_USER=""
+SSH_HOST=""
+SSH_DEST_FOLDER=""
+SSH_SRC_FOLDER=""
+SSH_DEST_FOLDER_PREFIX=""
+SSH_SRC_FOLDER_PREFIX=""
+SSH_BIN="ssh"
+SSH_FLAGS=""
+SSH_CMD=""
+
+SRC_FOLDER=""
+DEST_FOLDER=""
+FILTER_RULES=""
+LOG_DIR="$HOME/.$APPNAME/log"
+AUTO_DELETE_LOG="1"  # on
+EXPIRATION_STRATEGY="1:1 30:7 365:30"
+STRATEGY_CONFIRM="1"  # on
+AUTO_EXPIRE="1"  # on
+
+RSYNC_BIN="rsync"
+RSYNC_FLAGS="-D --numeric-ids --links --hard-links --one-file-system --itemize-changes --times --recursive --perms --owner --group --stats --human-readable"
+
+TRAVEL_SPEC_FILE=""
+TRAVEL_GIT_REPO=""
+TRAVEL_LINKS_DIR=""
+
+NOW=$(date +"%Y-%m-%d-%H%M%S")
+PROFILE_DIR="$HOME/.$APPNAME"
+
+ACTION="backup"  # backup, initialize, travel, duplicate
+BACKUP_MODE="Time-Backup"  # Time-Backup or Duplicate-Backup
 
 # ---------------------------------------------------------------------------
 # Log functions: ALLOFF, BOLD, BLUE, GREEN, YELLOW, RED
@@ -91,11 +129,12 @@ fn_display_usage() {
     Usage: $(basename $0) [OPTION]... <[USER@HOST:]SOURCE_DIR> <[USER@HOST:]DESTINATION>
 
     Options:
-      -p, --profile </local/path/to/profile>
-                            Specify a backup profile. The profile can be used to set
-                            BACKUP_MODE, SOURCE_DIR, DESTINATION, the binary and flags
-                            of ssh and rsync, expiration strategy, auto-expire
-                            and filter rules for backup files.
+      -p, --profile </local/path/to/profile or profile-name>
+                            Specify a backup profile. Set a file path or a <profile-name>.
+                            The profile can be used to set BACKUP_MODE, SOURCE_DIR, DESTINATION,
+                            the binary and flags of ssh and rsync, expiration strategy,
+                            auto-expire and filter rules for backup files.
+                            ${APPNAME^} looks for the <profile-name>.prf file in ${PROFILE_DIR}.
       --ssh-get-flags       Display the default SSH flags that are used for backup and exit.
       --ssh-set-flags       Set the SSH flags that are used for backup.
       --ssh-append-flags    Append the SSH flags that are going to be used for backup.
@@ -248,8 +287,11 @@ fn_expire_backups() {
 fn_parse_profile() {
     local PRF="$1"
     if [ ! -f "${PRF}" ]; then
-        fn_log_error "Profile not found: '%s'!" "${PRF}"
-        exit 2
+        PRF="${PROFILE_DIR}/${PRF}.prf"
+        if [ ! -f "${PRF}" ]; then
+            fn_log_error "Profile not found: '%s' or '%s'!" "$1" "${PRF}"
+            exit 2
+        fi
     fi
     local fname="$(basename "${PRF}")"
     local N0=$(awk '/FILTER_RULES_BEGIN/{print NR;exit}' "${PRF}")
@@ -585,7 +627,7 @@ fn_check_SRC_DEST() {
     #  Create log folder if it doesn't exist
     if [ ! -d "$LOG_DIR" ]; then
         fn_log_info "Creating log folder in '%s'..." "$LOG_DIR"
-        mkdir -- "$LOG_DIR"
+        mkdir -p -- "$LOG_DIR"
     fi
 
     # Exit if source folder does not exist.
@@ -928,38 +970,8 @@ fn_action_duplicate() {
 }
 
 # ---------------------------------------------------------------------------
-# Source and destination information, Options
+# Main | Start
 # ---------------------------------------------------------------------------
-SSH_USER=""
-SSH_HOST=""
-SSH_DEST_FOLDER=""
-SSH_SRC_FOLDER=""
-SSH_DEST_FOLDER_PREFIX=""
-SSH_SRC_FOLDER_PREFIX=""
-SSH_BIN="ssh"
-SSH_FLAGS=""
-SSH_CMD=""
-
-SRC_FOLDER=""
-DEST_FOLDER=""
-FILTER_RULES=""
-LOG_DIR="$HOME/.$APPNAME"
-AUTO_DELETE_LOG="1"  # on
-EXPIRATION_STRATEGY="1:1 30:7 365:30"
-STRATEGY_CONFIRM="1"  # on
-AUTO_EXPIRE="1"  # on
-
-RSYNC_BIN="rsync"
-RSYNC_FLAGS="-D --numeric-ids --links --hard-links --one-file-system --itemize-changes --times --recursive --perms --owner --group --stats --human-readable"
-RSYNC_LOG_FILE="$LOG_DIR/$(date +"%Y-%m-%d-%H%M%S").log"
-
-TRAVEL_SPEC_FILE=""
-TRAVEL_GIT_REPO=""
-TRAVEL_LINKS_DIR=""
-
-ACTION="backup"  # backup, initialize, travel, duplicate
-BACKUP_MODE="Time-Backup"  # Time-Backup or Duplicate-Backup
-
 while :; do
     case $1 in
         -h|--help)
@@ -1062,9 +1074,6 @@ while :; do
     shift
 done
 
-# ---------------------------------------------------------------------------
-# MAIN
-# ---------------------------------------------------------------------------
 if [ "$ACTION" = "initialize" ]; then
     # initialize <DESTINATION>, create backup marker file
     fn_initialize_dest "$DEST_FOLDER"
@@ -1087,6 +1096,7 @@ elif [ "$ACTION" = "duplicate" ]; then
     if [ -n "$(fn_find "$INPROGRESS_FILE")" ]; then
         check_inprogress_task "$INPROGRESS_FILE"
     fi
+    RSYNC_LOG_FILE="$LOG_DIR/$(basename "$DEST_FOLDER")-$NOW.log"
     fn_action_duplicate
 else
     # default: time backup
@@ -1094,7 +1104,6 @@ else
     fn_show_backup_info
     # Setup additional variables
     export IFS=$'\n' # Better for handling spaces in filenames.
-    NOW=$(date +"%Y-%m-%d-%H%M%S")
     DEST="$DEST_FOLDER/$NOW"
     PREVIOUS_DEST="$(fn_find_backups | head -n 1)"
     INPROGRESS_FILE="$DEST_FOLDER/backup.inprogress"
@@ -1103,8 +1112,9 @@ else
         fn_handle_previous_backup
     fi
     fn_expire_old_backups
-    # Run in a loop to handle the "No space left on device" logic.
+    RSYNC_LOG_FILE="$LOG_DIR/$(basename "$DEST_FOLDER")-$NOW.log"
     try=0
+    # Run in a loop to handle the "No space left on device" logic.
     while  [ "$try" -le 16 ]; do
         ((try++))
         fn_action_backup

@@ -61,11 +61,12 @@ It is modified to support some new features and mainly used to back up my Arch L
 Usage: atb.sh [OPTION]... <[USER@HOST:]SOURCE_DIR> <[USER@HOST:]DESTINATION>
 
 Options:
-  -p, --profile </local/path/to/profile>
-                        Specify a backup profile. The profile can be used to set
-                        BACKUP_MODE, SOURCE_DIR, DESTINATION, the binary and flags
-                        of ssh and rsync, expiration strategy, auto-expire
-                        and filter rules for backup files.
+  -p, --profile </local/path/to/profile or profile-name>
+                        Specify a backup profile. Set a file path or a <profile-name>.
+                        The profile can be used to set BACKUP_MODE, SOURCE_DIR, DESTINATION,
+                        the binary and flags of ssh and rsync, expiration strategy,
+                        auto-expire and filter rules for backup files.
+                        Atb looks for the <profile-name>.prf file in /home/USER/.atb.
   --ssh-get-flags       Display the default SSH flags that are used for backup and exit.
   --ssh-set-flags       Set the SSH flags that are used for backup.
   --ssh-append-flags    Append the SSH flags that are going to be used for backup.
@@ -83,7 +84,7 @@ Options:
   --log-dir </path>     Set the rsync log file directory. If this flag is set, generated files
                         will not be managed by the script - in particular they will not be
                         automatically deleted.
-                        Default: /home/shmilee/.atb
+                        Default: /home/USER/.atb/log
   --no-color            Disable colorizing the log info warn error output in a tty.
   --init <DESTINATION>  Initialize <DESTINATION> by creating a backup marker file and exit.
   -t, --time-travel </local/path/to/a/specific/file>
