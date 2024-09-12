@@ -174,6 +174,42 @@ FILTER_RULES_BEGIN
 - /home/*/.local/share/QtProject/
 + /home/*/.local/
 
+# about /home/*/.*, single files
++ /home/*/.bash_history
++ /home/*/.bash_profile
++ /home/*/.bashrc
++ /home/*/.face.icon
++ /home/*/.gemrc
++ /home/*/.gitconfig
++ /home/*/.gitignore_global
++ /home/*/.gnuplot_history
++ /home/*/.gtkrc-2.0
++ /home/*/.lua_history
++ /home/*/.nanorc
++ /home/*/.netrc
++ /home/*/.npmrc
++ /home/*/.nvidia-settings-rc
++ /home/*/.pam_environment
++ /home/*/.pylintrc
++ /home/*/.pypirc
++ /home/*/.python_history
++ /home/*/.rst2arb.conf
++ /home/*/.screenrc
++ /home/*/.sqlite_history
+- /home/*/.ssl-key.log
++ /home/*/.tig_history
++ /home/*/.viminfo
++ /home/*/.vimrc
++ /home/*/.winboxopen.pck
++ /home/*/.Xdefaults
++ /home/*/.xinitrc
++ /home/*/.Xresources
++ /home/*/.xsession
++ /home/*/.yarnrc
++ /home/*/.zcompdump*
++ /home/*/.zsh_history
++ /home/*/.zshrc
+
 - /home/*/*
 - /home/*
 
