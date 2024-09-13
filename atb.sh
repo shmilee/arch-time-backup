@@ -58,7 +58,7 @@ fn_no_color() {
 }
 fn_set_color() {
     # if in a tty, https://unix.stackexchange.com/questions/401934
-    if [ -t 1 -a -t 2 ]; then
+    if [ -t 1 ] && [ -t 2 ]; then
         ALLOFF="\e[1;0m"
         BOLD="\e[1;1m"
         BLUE="${BOLD}\e[1;34m"
@@ -107,8 +107,8 @@ fn_log_info_cmd() {
 fn_log_info_ask() {
     local msg=$1 yesno; shift
     printf "${RED}[${APPNAME}]${ALLOFF} ${BOLD}${msg} [y/n] ${ALLOFF}" "$@"
-    read yesno
-    if [ "$yesno" = "y" -o "$yesno" = "Y" ]; then
+    read -r yesno
+    if [ "$yesno" = "y" ] || [ "$yesno" = "Y" ]; then
         return 0
     else
         return 1
@@ -126,7 +126,7 @@ trap 'fn_terminate_script' SIGINT
 # ---------------------------------------------------------------------------
 fn_display_usage() {
     local USAGE=$(sed -E 's/^[[:space:]]{4}//' <<EOF
-    Usage: $(basename $0) [OPTION]... <[USER@HOST:]SOURCE_DIR> <[USER@HOST:]DESTINATION>
+    Usage: $(basename "$0") [OPTION]... <[USER@HOST:]SOURCE_DIR> <[USER@HOST:]DESTINATION>
 
     Options:
       -p, --profile </local/path/to/profile or profile-name>
@@ -186,13 +186,13 @@ fn_parse_date() {
             # Under MacOS X Tiger
             # Or with GNU 'coreutils' installed (by homebrew)
             #   'date -j' doesn't work, so we do this:
-            local yy=$(expr ${1:0:4})
-            local mm=$(expr ${1:5:2} - 1)
-            local dd=$(expr ${1:8:2})
-            local hh=$(expr ${1:11:2})
-            local mi=$(expr ${1:13:2})
-            local ss=$(expr ${1:15:2})
-            perl -e 'use Time::Local; print timelocal('$ss','$mi','$hh','$dd','$mm','$yy'),"\n";' ;;
+            local yy=$((${1:0:4}))
+            local mm=$((${1:5:2} - 1))
+            local dd=$((${1:8:2}))
+            local hh=$((${1:11:2}))
+            local mi=$((${1:13:2}))
+            local ss=$((${1:15:2}))
+            perl -e "use Time::Local; print timelocal('$ss','$mi','$hh','$dd','$mm','$yy'),'\n';" ;;
     esac
 }
 
@@ -247,12 +247,12 @@ fn_expire_backups() {
             continue
         fi
         # Find which strategy token applies to this particular backup
-        for strategy_token in $(echo $EXPIRATION_STRATEGY | tr " " "\n" | sort -r -n); do
+        for strategy_token in $(echo "$EXPIRATION_STRATEGY" | tr " " "\n" | sort -r -n); do
             IFS=':' read -r -a t <<< "$strategy_token"
             # After which date (relative to today) this token applies (X) - we use seconds to get exact cut off time
-            local cut_off_timestamp=$((current_timestamp - ${t[0]} * 86400))
+            local cut_off_timestamp=$((current_timestamp - t[0] * 86400))
             # Every how many days should a backup be kept past the cut off date (Y) - we use days (not seconds)
-            local cut_off_interval_days=$((${t[1]}))
+            local cut_off_interval_days=$((t[1]))
             # If we've found the strategy token that applies to this backup
             if [ "$backup_timestamp" -le "$cut_off_timestamp" ]; then
                 # Special case: if Y is "0" we delete every time
@@ -302,17 +302,17 @@ fn_parse_profile() {
         source "${PRF}"
     else
         local profile_source="$(mktemp -u -t "${fname}.source.$$.XXXXX")"
-        if [ -n "$N1" -a -n "$N2" ]; then
-            awk -v n1=$N1 -v n2=$N2 '{if((NR<n1)||(NR>n2)){print $0}}' \
+        if [ -n "$N1" ] && [ -n "$N2" ]; then
+            awk -v n1="$N1" -v n2="$N2" '{if((NR<n1)||(NR>n2)){print $0}}' \
                 "${PRF}" >"${profile_source}"
             # filter part
             local filter="$(mktemp -u -t "${fname}.filter.$$.XXXXX")"
-            awk -v n1=$N1 -v n2=$N2 '{if((n1<NR)&&(NR<n2)){print $0}}' \
+            awk -v n1="$N1" -v n2="$N2" '{if((n1<NR)&&(NR<n2)){print $0}}' \
                 "${PRF}" >"${filter}"
             FILTER_RULES="${filter}"
             trap "rm -f -- '${filter}'" EXIT
         else
-            awk -v n=$N0 '{if(NR<n){print $0}}' "${PRF}" >"${profile_source}"
+            awk -v n="$N0" '{if(NR<n){print $0}}' "${PRF}" >"${profile_source}"
         fi
         source "${profile_source}"
         rm -f -- "${profile_source}"
@@ -359,7 +359,7 @@ fn_run_cmd() {
     if [ -n "$SSH_DEST_FOLDER_PREFIX" ]; then
         eval "$SSH_CMD '$1'"
     else
-        eval $1
+        eval "$1"
     fi
 }
 
@@ -367,7 +367,7 @@ fn_run_cmd_src() {
     if [ -n "$SSH_SRC_FOLDER_PREFIX" ]; then
         eval "$SSH_CMD '$1'"
     else
-        eval $1
+        eval "$1"
     fi
 }
 
@@ -485,9 +485,9 @@ fn_time_travel() {
     # 3. get the date/time folder names for backup folders
     local BACKUP_NAMES=($(fn_find_backups "$DEST_FOLDER" | sort))
     local DATE_VERSIONS=()
-    for back in ${BACKUP_NAMES[@]}; do
+    for back in "${BACKUP_NAMES[@]}"; do
         if [ -f "$back/$REL_APTH" ]; then
-            DATE_VERSIONS+=("$(basename $back)")
+            DATE_VERSIONS+=("$(basename "$back")")
         fi
     done
     fn_log_info_hl "${GREEN}" \
@@ -500,7 +500,7 @@ fn_time_travel() {
     local pre_inode=""
     local UNIQ_VERSIONS=()  # date of unique files
     local size_max=$((100*1024*1024))  # in bytes, show file md5 when its size<size_max(100M)
-    for datever in ${DATE_VERSIONS[@]}; do
+    for datever in "${DATE_VERSIONS[@]}"; do
         local file="$DEST_FOLDER/$datever/$REL_APTH"
         #this_size="$(fn_local_filesize "$file")"
         #this_hash="$(md5sum "$file" | awk '{print $1}')"
@@ -561,9 +561,9 @@ fn_time_travel() {
     fi
     #fn_log_info "GIT_action=$GIT_action, LDIR_action=$LDIR_action"
     # 6. ln or cp unique files
-    if [ "$GIT_action" != "" -o "$LDIR_action" != "" ]; then
+    if [ "$GIT_action" != "" ] || [ "$LDIR_action" != "" ]; then
         local base="$(basename "$REL_APTH")"
-        for datever in ${UNIQ_VERSIONS[@]}; do
+        for datever in "${UNIQ_VERSIONS[@]}"; do
             local file="$DEST_FOLDER/$datever/$REL_APTH"
             # git repo
             if [ "$GIT_action" != "" ]; then
@@ -595,7 +595,7 @@ fn_time_travel() {
         fi
     else
         local i=1
-        for datever in ${UNIQ_VERSIONS[@]}; do
+        for datever in "${UNIQ_VERSIONS[@]}"; do
             fn_log_info " $i) $DEST_FOLDER/$datever/$REL_APTH"
             ((i++))
         done
@@ -708,7 +708,7 @@ check_inprogress_task() {
         # 1. Grab the PID of previous run from the PID file
         local RUNNINGPID="$(fn_run_cmd "cat $INPROGRESS_FILE")"
         # 2. Get the command for the process currently running under that PID and look for our script name
-        local RUNNINGCMD="$(procps -wwfo cmd -p $RUNNINGPID --no-headers | grep "$APPNAME")"
+        local RUNNINGCMD="$(procps -wwfo cmd -p "$RUNNINGPID" --no-headers | grep "$APPNAME")"
         # 3. Grab the exit code from grep (0=found, 1=not found)
         local GREPCODE=$?
         # 4. if found, assume backup is still running
@@ -802,13 +802,13 @@ fn_check_rsync_log() {
     local CMD_RETURNCODE=$1
     if [ -n "$(grep "rsync error:" "$RSYNC_LOG_FILE")" ]; then
         fn_log_error "Rsync reported an error, $ACTION failed."
-    elif [ $CMD_RETURNCODE -ne 0 ]; then
+    elif [ "$CMD_RETURNCODE" -ne 0 ]; then
         fn_log_error "Rsync returned non-zero return code, $ACTION failed."
     elif [ -n "$(grep "rsync:" "$RSYNC_LOG_FILE")" ]; then
         fn_log_warn "Rsync reported a warning, $ACTION failed."
     else
         fn_log_info_hl "" "${ACTION^} completed without errors."
-        if [[ $AUTO_DELETE_LOG == "1" ]]; then
+        if [[ "$AUTO_DELETE_LOG" == "1" ]]; then
             rm -f -- "$RSYNC_LOG_FILE"
         fi
         return 0
@@ -833,7 +833,7 @@ fn_action_backup() {
 
     fn_run_cmd "echo $MYPID > $INPROGRESS_FILE"
     fn_set_rsync_backup_CMD
-    eval $CMD
+    eval "$CMD"
     local CMD_RETURNCODE=$?
     if [ -f "$FILTER_RULES" ]; then
         rm -f -- "$FILTER_RULES"
@@ -902,7 +902,7 @@ fn_check_show_duplicate_info() {
     local level1=$(echo "$marksrc" | awk -F'=' '/^level=/{print $2;exit}')
     local name2=$(echo "$markdest" | awk -F'=' '/^name=/{print $2;exit}')
     local level2=$(echo "$markdest" | awk -F'=' '/^level=/{print $2;exit}')
-    if [ -z "$name1" -o "$name1" != "$name2" ]; then
+    if [ -z "$name1" ] || [ "$name1" != "$name2" ]; then
         fn_log_error "The backup names of SRC_FOLDER and DEST_FOLDER are different!"
         fn_log_error " -> SRC_FOLDER(name=$name1) vs DEST_FOLDER(name=$name2)"
         exit 5
@@ -926,7 +926,7 @@ EOF
 }
 
 fn_set_rsync_duplicate_CMD() {
-    if ! echo $RSYNC_FLAGS | grep -q 'hard-links'; then
+    if ! echo "$RSYNC_FLAGS" | grep -q 'hard-links'; then
         fn_log_warn " Add option '--hard-links' for rsync, as $BACKUP_MODE mode requires it!"
         RSYNC_FLAGS="$RSYNC_FLAGS --hard-links"
     fi
@@ -950,7 +950,7 @@ fn_set_rsync_duplicate_CMD() {
 fn_action_duplicate() {
     fn_run_cmd "echo $MYPID > $INPROGRESS_FILE"
     fn_set_rsync_duplicate_CMD
-    eval $CMD
+    eval "$CMD"
     local CMD_RETURNCODE=$?
 
     # Check if we ran out of space
@@ -1077,12 +1077,10 @@ done
 if [ "$ACTION" = "initialize" ]; then
     # initialize <DESTINATION>, create backup marker file
     fn_initialize_dest "$DEST_FOLDER"
-    exit
 elif [ "$ACTION" = "travel" ]; then
     # time travel of specific file
     if [ -n "$TRAVEL_SPEC_FILE" ]; then
         fn_time_travel
-        exit
     else
         fn_display_usage
         exit 1
