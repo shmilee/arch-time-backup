@@ -1,0 +1,17 @@
+[Unit]
+Description=Hourly arch-time-backup timer for %i
+Documentation=https://github.com/shmilee/arch-time-backup
+ConditionPathExists=/usr/local/bin/atb.sh
+
+[Timer]
+Unit=atb@%i.service
+# 30 minutes after user first login
+OnStartupSec=30min
+# active service every 1 hour
+OnUnitActiveSec=55min
+AccuracySec=3s
+RandomizedDelaySec=10min
+FixedRandomDelay=false
+
+[Install]
+WantedBy=timers.target

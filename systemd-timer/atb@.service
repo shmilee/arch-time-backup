@@ -1,5 +1,5 @@
 [Unit]
-Description=Daily arch-time-backup for %i
+Description=Daily/Hourly arch-time-backup timer service for %i
 Documentation=https://github.com/shmilee/arch-time-backup
 ConditionPathExists=/usr/local/bin/atb.sh
 

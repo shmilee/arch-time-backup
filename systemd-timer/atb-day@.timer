@@ -1,12 +1,14 @@
 [Unit]
-Description=Daily arch-time-backup for %i
+Description=Daily arch-time-backup timer for %i
 Documentation=https://github.com/shmilee/arch-time-backup
 ConditionPathExists=/usr/local/bin/atb.sh
 
 [Timer]
+Unit=atb@%i.service
 OnCalendar=*-*-* 18:00:00
-AccuracySec=30m
-RandomizedDelaySec=2h
+AccuracySec=10min
+RandomizedDelaySec=1h
+FixedRandomDelay=false
 Persistent=true
 
 [Install]

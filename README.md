@@ -264,15 +264,42 @@ Ref:
 
 ### systemd timers
 
+Use systemd timer to run `atb.sh` every day or every hour.
+
+Ref:
+- [systemd.timer man page](https://www.freedesktop.org/software/systemd/man/latest/systemd.timer.html)
+- [ultimate tutorial](https://www.blunix.com/blog/ultimate-tutorial-about-systemd-timers.html#onbootsec-since-the-machine-booted)
+- [every-hour-after-first-run](https://unix.stackexchange.com/questions/704109/)
+
+* Install timer, service files.
+
 ```
-cp ./systemd-timer/atb@.timer ~/.config/systemd/user/
-cp ./systemd-timer/atb@.service ~/.config/systemd/user/
+[$] cp -v ./systemd-timer/atb-day@.timer ~/.config/systemd/user/
+[$] cp -v ./systemd-timer/atb-hour@.timer ~/.config/systemd/user/
+[$] cp -v ./systemd-timer/atb@.service ~/.config/systemd/user/
+```
 
-cp ./atb-ifts_study-backup.prf ~/.atb/atb-ifts_study-backup.prf
+* Add a timer instance for `atb-ifts_study-backup`.
 
-systemctl --user enable atb@atb-ifts_study-backup.timer
-systemctl --user start atb@atb-ifts_study-backup.timer
-systemctl --user status atb@atb-ifts_study-backup.{timer,service}
+```
+[$] cp -v ./atb-ifts_study-backup.prf ~/.atb/atb-ifts_study-backup.prf
+[$] systemctl --user enable atb-hour@atb-ifts_study-backup.timer
+[$] systemctl --user start atb-hour@atb-ifts_study-backup.timer
+[$] systemctl --user status atb-hour@atb-ifts_study-backup.timer atb@atb-ifts_study-backup.service
+# check atb journal log
+[$] journalctl --user -u atb@atb-ifts_study-backup.service
+```
+
+* List started timer units after adding other timer instances.
+```
+[$] systemctl --user list-timers
+NEXT                         LEFT LAST                           PASSED UNIT                                   ACTIVATES
+Fri 2024-09-13 11:57:22 CST 46min Fri 2024-09-13 10:53:25 CST 17min ago atb-hour@atb-ifts_study-backup.timer   atb@atb-ifts_study-backup.service
+Fri 2024-09-13 12:10:15 CST 59min Fri 2024-09-13 11:09:57 CST   29s ago atb-hour@atb-project-backup.timer      atb@atb-project-backup.service
+Fri 2024-09-13 18:24:06 CST    7h -                                   - atb-day@atb-userdata-backup.timer      atb@atb-userdata-backup.service
+
+3 timers listed.
+Pass --all to see loaded but inactive timers, too.
 ```
 
 ## other
