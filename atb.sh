@@ -39,6 +39,8 @@ TRAVEL_SPEC_FILE=""
 TRAVEL_GIT_REPO=""
 TRAVEL_LINKS_DIR=""
 
+NOTIFY_TIME=-1
+
 NOW=$(date +"%Y-%m-%d-%H%M%S")
 PROFILE_DIR="$HOME/.$APPNAME"
 
@@ -114,6 +116,18 @@ fn_log_info_ask() {
         return 1
     fi
 }
+fn_set_notify_time() {
+    if [ "$1" -ge 0 ] 2>/dev/null; then
+        if notify-send -t 1 'test' 2>/dev/null; then
+            NOTIFY_TIME=$(($1*1000))
+        fi
+    fi
+}
+fn_notify() {
+    if [ "$NOTIFY_TIME" -ge 0 ]; then
+        notify-send -t $NOTIFY_TIME -u "$1" "$2" "$3"
+    fi
+}
 
 # ---------------------------------------------------------------------------
 # Make sure everything really stops when CTRL+C is pressed
@@ -154,6 +168,9 @@ fn_display_usage() {
                             automatically deleted.
                             Default: $LOG_DIR
       --no-color            Disable colorizing the log info warn error output in a tty.
+      --notify-time <T>     Set the notification timeout in seconds. When backup finishes,
+                            try to use notify-send to seed a desktop notification.
+                            Set a negative integer to disable this. Default: -1
       --init <DESTINATION>  Initialize <DESTINATION> by creating a backup marker file and exit.
       -t, --time-travel </local/path/to/a/specific/file>
                             List all versions of a specific file in a backup DESTINATION and exit.
@@ -863,8 +880,10 @@ fn_action_backup() {
         fn_ln "$(basename -- "$DEST")" "$DEST_FOLDER/latest"
         # Remove .inprogress file only when rsync succeeded
         fn_rm_file "$INPROGRESS_FILE"
+        fn_notify "normal" "${APPNAME^^} ${BACKUP_MODE} completed!" "$(basename "$DEST_FOLDER"): $NOW"
         exit
     fi
+    fn_notify "critical" "${APPNAME^^} ${BACKUP_MODE} failed!" "$(basename "$DEST_FOLDER"): $NOW"
     exit 1
 }
 
@@ -964,8 +983,10 @@ fn_action_duplicate() {
     # Remove duplicate.inprogress file only when rsync succeeded
     if fn_check_rsync_log $CMD_RETURNCODE; then
         fn_rm_file "$INPROGRESS_FILE"
+        fn_notify "normal" "${APPNAME^^} ${BACKUP_MODE} completed!" "$(basename "$DEST_FOLDER")"
         exit
     fi
+    fn_notify "critical" "${APPNAME^^} ${BACKUP_MODE} failed!" "$(basename "$DEST_FOLDER")"
     exit 1
 }
 
@@ -1031,6 +1052,10 @@ while :; do
             ;;
         --no-color)
             fn_no_color
+            ;;
+         --notify-time)
+            shift
+            fn_set_notify_time "$1"
             ;;
         --init)
             shift

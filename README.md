@@ -41,6 +41,9 @@ It is modified to support some new features and mainly used to back up my Arch L
 * When atb.sh outputting log onto a tty, colorize the info, warn, error.
   Option `--no-color` is added to disable this.
 
+* After the backup is finished, attempt to use `notify-send` to seed desktop notifications.
+  The `timeout` is set by option `--notify-time` in seconds.
+
 * Add option `--init` to initialize a new `DESTINATION`.
   Write some information to the `backup.marker` file, such as the backup `name` and `level`.
 
@@ -86,6 +89,9 @@ Options:
                         automatically deleted.
                         Default: /home/USER/.atb/log
   --no-color            Disable colorizing the log info warn error output in a tty.
+  --notify-time <T>     Set the notification timeout in seconds. When backup finishes,
+                        try to use notify-send to seed a desktop notification.
+                        Set a negative integer to disable this. Default: -1
   --init <DESTINATION>  Initialize <DESTINATION> by creating a backup marker file and exit.
   -t, --time-travel </local/path/to/a/specific/file>
                         List all versions of a specific file in a backup DESTINATION and exit.
