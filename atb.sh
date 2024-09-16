@@ -880,6 +880,8 @@ fn_action_backup() {
         fn_ln "$(basename -- "$DEST")" "$DEST_FOLDER/latest"
         # Remove .inprogress file only when rsync succeeded
         fn_rm_file "$INPROGRESS_FILE"
+        # rsync --times preserve mtime of $DEST, touch it to now
+        fn_touch "$DEST"
         fn_notify "normal" "${APPNAME^^} ${BACKUP_MODE} completed!" "$(basename "$DEST_FOLDER"): $NOW"
         exit
     fi
