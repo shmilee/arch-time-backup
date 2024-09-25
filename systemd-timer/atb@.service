@@ -7,6 +7,8 @@ ConditionPathExists=/usr/local/bin/atb.sh
 Type=oneshot
 ExecStart=/usr/local/bin/atb.sh --rsync-sidekick --strategy-noconfirm --notify-time 10 -p %i
 
+# put rsync-sidekick in systemd default PATH = /usr/local/bin:/usr/bin
+
 # https://bbs.archlinux.org/viewtopic.php?id=233035
 # https://unix.stackexchange.com/questions/548499
 # when systemctl --user service, need to remove "User=" line

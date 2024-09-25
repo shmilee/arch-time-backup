@@ -1093,10 +1093,10 @@ while :; do
             RSYNC_FLAGS="$RSYNC_FLAGS $1"
             ;;
         --rsync-sidekick)
-            if fn_check_BIN "$RSYNC_SIDEKICK_BIN"; then
+            if hash "$RSYNC_SIDEKICK_BIN" &>/dev/null; then
                 RSYNC_SIDEKICK="1"
             else
-                fn_log_warn "Not found, rsync-sidekick: '%s'" "$RSYNC_SIDEKICK_BIN"
+                fn_log_warn "rsync-sidekick not found: '%s'" "$RSYNC_SIDEKICK_BIN"
             fi
             ;;
         --strategy)
