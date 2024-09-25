@@ -34,6 +34,8 @@ AUTO_EXPIRE="1"  # on
 
 RSYNC_BIN="rsync"
 RSYNC_FLAGS="-D --numeric-ids --links --hard-links --one-file-system --itemize-changes --times --recursive --perms --owner --group --stats --human-readable"
+RSYNC_SIDEKICK_BIN="rsync-sidekick"
+RSYNC_SIDEKICK="0"  # off
 
 TRAVEL_SPEC_FILE=""
 TRAVEL_GIT_REPO=""
@@ -57,6 +59,8 @@ fn_no_color() {
     GREEN=""
     YELLOW=""
     RED=""
+    PURPLE=""
+    CYAN=""
 }
 fn_set_color() {
     # if in a tty, https://unix.stackexchange.com/questions/401934
@@ -67,6 +71,8 @@ fn_set_color() {
         GREEN="${BOLD}\e[1;32m"
         YELLOW="${BOLD}\e[1;33m"
         RED="${BOLD}\e[1;31m"
+        PURPLE="${BOLD}\e[1;35m"
+        CYAN="${BOLD}\e[1;36m"
     else
         fn_no_color
     fi
@@ -146,8 +152,8 @@ fn_display_usage() {
       -p, --profile </local/path/to/profile or profile-name>
                             Specify a backup profile. Set a file path or a <profile-name>.
                             The profile can be used to set BACKUP_MODE, SOURCE_DIR, DESTINATION,
-                            the binary and flags of ssh and rsync, expiration strategy,
-                            auto-expire and filter rules for backup files.
+                            the binary and flags of ssh and rsync, the binary of rsync-sidekick,
+                            expiration strategy, auto-expire and filter rules for backup files.
                             ${APPNAME^} looks for the <profile-name>.prf file in ${PROFILE_DIR}.
       --ssh-get-flags       Display the default SSH flags that are used for backup and exit.
       --ssh-set-flags       Set the SSH flags that are used for backup.
@@ -157,6 +163,9 @@ fn_display_usage() {
                             If SOURCE_DIR or DESTINATION is on FAT, --modify-window=2 will be added.
       --rsync-set-flags     Set the rsync flags that are used for backup.
       --rsync-append-flags  Append the rsync flags that are going to be used for backup.
+      --rsync-sidekick      An alternative to rsync option --detect-renamed, which is not available
+                            in official release. Use https://github.com/m-manu/rsync-sidekick to
+                            find renamed and moved files before rsync runs Time-Backup.
       --strategy            Set the expiration strategy. Default: "1:1 30:7 365:30" means after one
                             day, keep one backup per day. After 30 days, keep one backup every 7 days.
                             After 365 days keep one backup every 30 days.
@@ -345,6 +354,7 @@ fn_parse_profile() {
     fi
     #SSH_BIN, RSYNC_BIN
     #SSH_FLAGS, RSYNC_FLAGS,
+    #RSYNC_SIDEKICK_BIN
     #EXPIRATION_STRATEGY, AUTO_EXPIRE
 }
 
@@ -781,6 +791,50 @@ fn_expire_old_backups() {
     fi
 }
 
+# -----------------------------------------------------------------------
+# Run rsync-sidekick before Time-Backup action
+# -----------------------------------------------------------------------
+fn_run_rsync_sidekick() {
+    if [[ "$RSYNC_SIDEKICK" == "0" ]]; then
+        return
+    fi
+    if [ -z "$PREVIOUS_DEST" ]; then
+        return
+    fi
+    if [ -n "$SSH_DEST_FOLDER_PREFIX" ] || [ -n "$SSH_SRC_FOLDER_PREFIX" ]; then
+        fn_log_warn "rsync-sidekick does not work with SSH directory."
+        fn_log_warn "Use rsync-sidekick with SSHFS or wait for remote support!"
+        fn_log_info "  1) https://github.com/m-manu/rsync-sidekick/issues/1"
+        fn_log_info "  2) https://github.com/m-manu/rsync-sidekick/issues/7"
+        return
+    fi
+    fn_log_info_hl "$CYAN" \
+        "[%b] Create DEST: '$(basename $DEST)' <- PREVIOUS_DEST: '$PREVIOUS_DEST'" \
+        "sidekick"
+    local PRE_CMD="$RSYNC_BIN $RSYNC_FLAGS --log-file '$RSYNC_LOG_FILE'"
+    local abs_previous="$(fn_get_absolute_path "$PREVIOUS_DEST")"
+    PRE_CMD="$PRE_CMD --link-dest='$abs_previous' -- '$abs_previous/' '$DEST/'"
+    fn_log_info "Running: $PRE_CMD"
+    eval "$PRE_CMD"
+    if [ "$?" -ne 0 ]; then
+        fn_log_warn "grep -E 'rsync:|rsync error:' '%s'" "$RSYNC_LOG_FILE"
+    fi
+    fn_log_info_hl "$CYAN" \
+        "[%b] Propagate file renames, movements and timestamp changes in DEST..." \
+        "sidekick"
+    local KICK_CMD="$RSYNC_SIDEKICK_BIN '$SRC_FOLDER/' '$DEST/'"
+    fn_log_info "Running: $KICK_CMD"
+    eval "$KICK_CMD"
+    if [ "$?" -ne 0 ]; then
+        fn_log_warn "rsync-sidekick returned non-zero return code."
+    fi
+    fn_log_info "Add the --delete-delay rsync option."
+    RSYNC_FLAGS="${RSYNC_FLAGS} --delete-delay"
+}
+
+# -----------------------------------------------------------------------
+# Setup Time-Backup CMD and show cmd info
+# -----------------------------------------------------------------------
 fn_set_rsync_backup_CMD() {
     # Check if we are doing an incremental backup (if previous backup exists).
     local LINK_DEST_OPTION=""
@@ -849,6 +903,7 @@ fn_action_backup() {
     fi
 
     fn_run_cmd "echo $MYPID > $INPROGRESS_FILE"
+    fn_run_rsync_sidekick
     fn_set_rsync_backup_CMD
     eval "$CMD"
     local CMD_RETURNCODE=$?
@@ -1036,6 +1091,13 @@ while :; do
         --rsync-append-flags)
             shift
             RSYNC_FLAGS="$RSYNC_FLAGS $1"
+            ;;
+        --rsync-sidekick)
+            if fn_check_BIN "$RSYNC_SIDEKICK_BIN"; then
+                RSYNC_SIDEKICK="1"
+            else
+                fn_log_warn "Not found, rsync-sidekick: '%s'" "$RSYNC_SIDEKICK_BIN"
+            fi
             ;;
         --strategy)
             shift

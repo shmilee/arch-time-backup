@@ -35,6 +35,14 @@ It is modified to support some new features and mainly used to back up my Arch L
   When using a profile, the filter rules will be written to a temporary file first
   and then taken by rsync option `--filter="merge a.tmpfile.of.rules"`.
 
+* Add option `--rsync-sidekick` to run [rsync-sidekick](https://github.com/m-manu/rsync-sidekick) before rsync.
+  This only works with local directories and the `Time-Backup` mode. It is recommended to enable this if there
+  are large files being moved within `SOURCE_DIR`. A duplicate latest backup (`DUP`) will be created first,
+  then use rsync-sidekick to propagate file renames, movements changes from `SOURCE_DIR` to the duplicate `DUP`.
+  Finally, run rsync between `SOURCE_DIR` and the duplicate `DUP` with append option `--delete-delay`.
+  This is an alternative to rsync option [--detect-renamed](https://github.com/RsyncProject/rsync-patches/blob/master/detect-renamed.diff),
+  see more: [bug](https://bugzilla.samba.org/show_bug.cgi?id=2294), [issue](https://github.com/RsyncProject/rsync/issues/590).
+
 * Ask for confirmation when deleting backups according to the strategy.
   Use option `--strategy-noconfirm` to skip confirmation. Be cautious when deleting data.
 
@@ -67,8 +75,8 @@ Options:
   -p, --profile </local/path/to/profile or profile-name>
                         Specify a backup profile. Set a file path or a <profile-name>.
                         The profile can be used to set BACKUP_MODE, SOURCE_DIR, DESTINATION,
-                        the binary and flags of ssh and rsync, expiration strategy,
-                        auto-expire and filter rules for backup files.
+                        the binary and flags of ssh and rsync, the binary of rsync-sidekick,
+                        expiration strategy, auto-expire and filter rules for backup files.
                         Atb looks for the <profile-name>.prf file in /home/USER/.atb.
   --ssh-get-flags       Display the default SSH flags that are used for backup and exit.
   --ssh-set-flags       Set the SSH flags that are used for backup.
@@ -78,6 +86,9 @@ Options:
                         If SOURCE_DIR or DESTINATION is on FAT, --modify-window=2 will be added.
   --rsync-set-flags     Set the rsync flags that are used for backup.
   --rsync-append-flags  Append the rsync flags that are going to be used for backup.
+  --rsync-sidekick      An alternative to rsync option --detect-renamed, which is not available
+                        in official release. Use https://github.com/m-manu/rsync-sidekick to
+                        find renamed and moved files before rsync runs Time-Backup.
   --strategy            Set the expiration strategy. Default: "1:1 30:7 365:30" means after one
                         day, keep one backup per day. After 30 days, keep one backup every 7 days.
                         After 365 days keep one backup every 30 days.

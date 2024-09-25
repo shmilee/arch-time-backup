@@ -5,7 +5,7 @@ ConditionPathExists=/usr/local/bin/atb.sh
 
 [Service]
 Type=oneshot
-ExecStart=/usr/local/bin/atb.sh --strategy-noconfirm --notify-time 10 -p %i
+ExecStart=/usr/local/bin/atb.sh --rsync-sidekick --strategy-noconfirm --notify-time 10 -p %i
 
 # https://bbs.archlinux.org/viewtopic.php?id=233035
 # https://unix.stackexchange.com/questions/548499
