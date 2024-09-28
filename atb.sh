@@ -100,7 +100,7 @@ fn_log_info_hl() {
             highlight+=("${color}${arg}${ALLOFF}${BOLD}")
         done
     else
-        local highlight="${@:3}"
+        local highlight=("${@:3}")
     fi
     printf "${BLUE}[${APPNAME}]${ALLOFF} ${BOLD}${msg}${ALLOFF}\n" "${highlight[@]}"
 }
@@ -541,8 +541,8 @@ fn_time_travel() {
             if [ "$this_size" -lt $size_max ]; then
                 this_hash=", md5=$(md5sum "$file" | awk '{print $1}')"
             fi
-            fn_log_info_hl '' "\t%s: inode=%s%s, size=%s" \
-                "$datever" "$this_inode" "$this_hash" "$this_size"
+            fn_log_info_hl '' "\t%s: inode=%s, size=%s%s" \
+                "$datever" "$this_inode" "$this_size" "$this_hash"
             UNIQ_VERSIONS+=("$datever")
         else
             fn_log_info "\t%s: inode=%s" "$datever" "$this_inode"
