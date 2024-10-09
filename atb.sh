@@ -376,7 +376,7 @@ fn_parse_ssh() {
 }
 
 fn_check_BIN() {
-    if ! hash "$1" &>/dev/null; then
+    if ! command -v "$1" &>/dev/null; then
         fn_log_error "Command not found: '%s'!" "$1"
         exit 3
     fi
@@ -1093,7 +1093,7 @@ while :; do
             RSYNC_FLAGS="$RSYNC_FLAGS $1"
             ;;
         --rsync-sidekick)
-            if hash "$RSYNC_SIDEKICK_BIN" &>/dev/null; then
+            if command -v "$RSYNC_SIDEKICK_BIN" &>/dev/null; then
                 RSYNC_SIDEKICK="1"
             else
                 fn_log_warn "rsync-sidekick not found: '%s'" "$RSYNC_SIDEKICK_BIN"

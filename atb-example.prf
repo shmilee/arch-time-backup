@@ -12,7 +12,7 @@ BACKUP_MODE="Time-Backup"
 SOURCE_DIR="/"
 DESTINATION="/media/BackArch/atb-slim-backup"
 
-## Set SSH Rsync command binary. Default: ssh, rsync
+## Set SSH Rsync command binary (name or path). Default: ssh, rsync
 #SSH_BIN="ssh"
 #RSYNC_BIN="rsync"
 
@@ -31,7 +31,8 @@ DESTINATION="/media/BackArch/atb-slim-backup"
 RSYNC_FLAGS="-D --numeric-ids --links --hard-links --itemize-changes --times --recursive --perms --owner --group --stats --human-readable"
 RSYNC_FLAGS="-aAX --info=progress ${RSYNC_FLAGS}"
 
-## Set rsync-sidekick command binary. Default: rsync-sidekick
+## Set rsync-sidekick command binary (name or path).
+## Default: rsync-sidekick
 ## More details: https://github.com/m-manu/rsync-sidekick
 #RSYNC_SIDEKICK_BIN="rsync-sidekick"
 
