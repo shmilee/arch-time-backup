@@ -5,7 +5,7 @@ ConditionPathExists=/usr/local/bin/atb.sh
 
 [Service]
 Type=oneshot
-ExecStart=/usr/local/bin/atb.sh --rsync-sidekick --strategy-noconfirm --notify-time 10 -p %i
+ExecStart=/usr/local/bin/atb.sh -p %i --rsync-sidekick --strategy-noconfirm --notify-time 10
 
 # put rsync-sidekick in systemd default PATH = /usr/local/bin:/usr/bin
 
