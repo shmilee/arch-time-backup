@@ -49,6 +49,11 @@ PROFILE_DIR="$HOME/.$APPNAME"
 ACTION="backup"  # backup, initialize, travel, duplicate
 BACKUP_MODE="Time-Backup"  # Time-Backup or Duplicate-Backup
 
+DUPLICATE_SRC_BACKUPS=()
+DUPLICATE_DEST_BACKUPS=()
+# -1: none, 0: all, 0<&<Len: part, Len: none, backup dates in SRC_FOLDER to duplicate
+DUPLICATE_START_INDEX=-1
+
 # ---------------------------------------------------------------------------
 # Log functions: ALLOFF, BOLD, BLUE, GREEN, YELLOW, RED
 # ---------------------------------------------------------------------------
@@ -510,7 +515,7 @@ fn_time_travel() {
     fn_log_info "Specific Version:       %s" "$DATEVER"
     fn_log_info "Specific Relative Path: %s" "$REL_APTH"
     # 3. get the date/time folder names for backup folders
-    local BACKUP_NAMES=($(fn_find_backups "$DEST_FOLDER" | sort))
+    local BACKUP_NAMES=($(fn_find_backups | sort))
     local DATE_VERSIONS=()
     for back in "${BACKUP_NAMES[@]}"; do
         if [ -f "$back/$REL_APTH" ]; then
@@ -871,14 +876,15 @@ fn_set_rsync_backup_CMD() {
 # -----------------------------------------------------------------------
 fn_check_rsync_log() {
     local CMD_RETURNCODE=$1
+    local ACTDESC=$2
     if [ -n "$(grep "rsync error:" "$RSYNC_LOG_FILE")" ]; then
-        fn_log_error "Rsync reported an error, $ACTION failed."
+        fn_log_error "Rsync reported an error, $ACTION$ACTDESC failed."
     elif [ "$CMD_RETURNCODE" -ne 0 ]; then
-        fn_log_error "Rsync returned non-zero return code, $ACTION failed."
+        fn_log_error "Rsync returned non-zero return code, $ACTION$ACTDESC failed."
     elif [ -n "$(grep "rsync:" "$RSYNC_LOG_FILE")" ]; then
-        fn_log_warn "Rsync reported a warning, $ACTION failed."
+        fn_log_warn "Rsync reported a warning, $ACTION$ACTDESC failed."
     else
-        fn_log_info_hl "" "${ACTION^} completed without errors."
+        fn_log_info_hl "" "${ACTION^}$ACTDESC completed without errors."
         if [[ "$AUTO_DELETE_LOG" == "1" ]]; then
             rm -f -- "$RSYNC_LOG_FILE"
         fi
@@ -988,6 +994,12 @@ fn_check_show_duplicate_info() {
         fn_log_error " -> SRC_FOLDER(level=$level1) vs DEST_FOLDER(level=$level2)"
         exit 5
     fi
+
+    if ! echo "$RSYNC_FLAGS" | grep -q 'hard-links'; then
+        fn_log_warn " Add option '--hard-links' for rsync, as $BACKUP_MODE mode requires it!"
+        RSYNC_FLAGS="$RSYNC_FLAGS --hard-links"
+    fi
+
     fn_log_info "Duplicate Information:"
     cat <<EOF
 
@@ -1001,22 +1013,102 @@ fn_check_show_duplicate_info() {
 EOF
 }
 
-fn_set_rsync_duplicate_CMD() {
-    if ! echo "$RSYNC_FLAGS" | grep -q 'hard-links'; then
-        fn_log_warn " Add option '--hard-links' for rsync, as $BACKUP_MODE mode requires it!"
-        RSYNC_FLAGS="$RSYNC_FLAGS --hard-links"
-    fi
+# ---------------------------------------------------------------------------
+# Compare duplicate backup dates of SRC_FOLDER & DEST_FOLDER
+# ---------------------------------------------------------------------------
+# list "${@:3}", $1 first index number, $2 number of columns
+fn_list() {
+    local n=($(seq -w $1 $((${#@}+$1-3)))) i=0 _f
+    for _f in ${@:3}; do
+        (($i%$2==0)) && echo -e -n "\t" # indent
+        echo -e -n "${n[$i]}) $_f;\t"
+        (( $i%$2 == $(($2-1)) )) && echo # \n
+        ((i++))
+    done
+    (($i%$2==0)) || echo # aliquant \n
+}
 
+fn_compare_duplicate_backups() {
+    DUPLICATE_SRC_BACKUPS=($(fn_run_cmd_src "find "$SRC_FOLDER/" \
+        -maxdepth 1 -type d -name \"????-??-??-??????\" -prune \
+        | sort | sed 's|$SRC_FOLDER/||'"))
+    local src_backup_N=${#DUPLICATE_SRC_BACKUPS[@]}
+    DUPLICATE_DEST_BACKUPS=($(fn_find_backups | sort | sed "s|$DEST_FOLDER/||"))
+    local dest_backup_N=${#DUPLICATE_DEST_BACKUPS[@]}
+    if [ "$src_backup_N" = 0 ]; then
+        fn_log_info "No backups in $SRC_FOLDER/ to duplicate! Exit."
+        exit 0
+    fi
+    local backup_date backup_timestamp i j
+    local src_backup_timestamp=()
+    for backup_date in ${DUPLICATE_SRC_BACKUPS[@]}; do
+        src_backup_timestamp+=($(fn_parse_date "$backup_date"))
+    done
+    local dest_backup_timestamp=()
+    for backup_date in ${DUPLICATE_DEST_BACKUPS[@]}; do
+        dest_backup_timestamp+=($(fn_parse_date "$backup_date"))
+    done
+
+    # start to compare
+    DUPLICATE_START_INDEX=-1  # -1: none, 0: all, 0<&<src_backup_N: part, src_backup_N: none
+    if [ "$dest_backup_N" = 0 ]; then
+        DUPLICATE_START_INDEX=0
+    else
+        local dest_latest=${dest_backup_timestamp[$((dest_backup_N-1))]}
+        for i in $(seq 0 $((src_backup_N-1))); do
+            if [ "${src_backup_timestamp[$i]}" -gt "$dest_latest" ]; then
+                DUPLICATE_START_INDEX=$i
+                break
+            fi
+        done
+    fi
+    # skipped backup dates before DUPLICATE_START_INDEX (-1 -> src_backup_N-1) in SRC_FOLDER
+    local DUPLICATE_SKIPPED=()
+    for i in $(seq 0 $((DUPLICATE_START_INDEX-1))); do
+        local found='N'
+        for j in $(seq 0 $((dest_backup_N-1))); do
+            if [ "${DUPLICATE_DEST_BACKUPS[$j]}" == "${DUPLICATE_SRC_BACKUPS[$i]}" ]; then
+                found='Y'
+                break
+            fi
+        done
+        if [ "$found" = 'N' ]; then
+            DUPLICATE_SKIPPED+=(${DUPLICATE_SRC_BACKUPS[$i]})
+        fi
+    done
+
+    if [ "$dest_backup_N" = 0 ]; then
+        local dest_latest="None"
+    else
+        local dest_latest="'${DUPLICATE_DEST_BACKUPS[$((dest_backup_N-1))]}'"
+    fi
+    fn_log_info "Found ${GREEN}$dest_backup_N${ALLOFF} backups in '${SSH_DEST_FOLDER_PREFIX}${DEST_FOLDER}/', latest: $dest_latest."
+    fn_log_info "Found ${BLUE}${#DUPLICATE_SKIPPED[@]}/$src_backup_N${ALLOFF} Skipped backups in '${SSH_SRC_FOLDER_PREFIX}${SRC_FOLDER}/'."
+    if [ "${#DUPLICATE_SKIPPED[@]}" -gt 0 ]; then
+        fn_list 1 2 ${DUPLICATE_SKIPPED[@]}
+    fi
+    if [ "$DUPLICATE_START_INDEX" = -1 ]; then  # to ((0 -> src_backup_N)
+        DUPLICATE_START_INDEX=$src_backup_N
+    fi
+    local New=$((src_backup_N-DUPLICATE_START_INDEX))
+    fn_log_info "Found ${RED}$New/$src_backup_N${ALLOFF} New backups in '${SSH_SRC_FOLDER_PREFIX}${SRC_FOLDER}/'."
+    if [ "$New" -gt 0 ]; then
+        fn_list 1 2 ${DUPLICATE_SRC_BACKUPS[@]:$DUPLICATE_START_INDEX}  # slice ${arr[@]:start:len}
+    fi
+}
+
+fn_set_rsync_duplicate_CMD() {
     CMD="$RSYNC_BIN $RSYNC_FLAGS --log-file '$RSYNC_LOG_FILE'"
     if [ -n "$SSH_CMD" ]; then
         CMD="$CMD --compress -e '$SSH_BIN $SSH_FLAGS'"
     fi
-    CMD="$CMD --exclude='backup.marker' -- '$SSH_SRC_FOLDER_PREFIX$SRC_FOLDER/' '$SSH_DEST_FOLDER_PREFIX$DEST_FOLDER/'"
+    echo
     fn_log_info "Starting Duplicate Backup..."
     fn_log_info "From: %s/" "$SSH_SRC_FOLDER_PREFIX$SRC_FOLDER"
     fn_log_info "To:   %s/" "$SSH_DEST_FOLDER_PREFIX$DEST_FOLDER"
-    fn_log_info "Running command:"
-    fn_log_info "  $CMD"
+    fn_log_info "Command Template:"
+    fn_log_info "  $CMD \ "
+    fn_log_info "    --link-dest='%%PREVIOUS_DEST_BACKUP%%' -- '%%SRC_BACKUP%%/' '%%DEST_BACKUP%%/'"
     echo
 }
 
@@ -1024,27 +1116,106 @@ fn_set_rsync_duplicate_CMD() {
 # Start duplicate action
 # -----------------------------------------------------------------------
 fn_action_duplicate() {
-    fn_run_cmd "echo $MYPID > $INPROGRESS_FILE"
+    local backups_TODO=(${DUPLICATE_SRC_BACKUPS[@]:$DUPLICATE_START_INDEX})
+    local N_TODO=${#backups_TODO[@]}
+    if [ "$N_TODO" = 0 ]; then
+        fn_log_info "No new backups to duplicate!"
+        exit 0
+    fi
     fn_set_rsync_duplicate_CMD
-    eval "$CMD"
-    local CMD_RETURNCODE=$?
+    local widthN=($(seq -w 1 $N_TODO))
+    local i backup_date PREVIOUS_DEST_BACKUP backup_opts
+    for i in $(seq 0 $((N_TODO-1))); do
+        fn_run_cmd "echo $MYPID > $INPROGRESS_FILE"
+        backup_date=${backups_TODO[$i]}
+        fn_log_info "${GREEN}${widthN[i]}/$N_TODO${ALLOFF}: Duplicating $backup_date ..."
+        if [ "$i" = 0 ]; then  # first
+            if [ "${#DUPLICATE_DEST_BACKUPS[@]}" = 0 ]; then
+                PREVIOUS_DEST_BACKUP=""
+            else
+                PREVIOUS_DEST_BACKUP="${DUPLICATE_DEST_BACKUPS[${#DUPLICATE_DEST_BACKUPS[@]}-1]}"
+            fi
+        else
+            PREVIOUS_DEST_BACKUP="${backups_TODO[$((i-1))]}"
+        fi
+        backup_opts=""
+        if [ -n "$PREVIOUS_DEST_BACKUP" ]; then
+            if fn_run_cmd "test -d '$DEST_FOLDER/$PREVIOUS_DEST_BACKUP'"; then
+                PREVIOUS_DEST_BACKUP="$(fn_get_absolute_path "$DEST_FOLDER/$PREVIOUS_DEST_BACKUP")"
+                backup_opts="--link-dest='$PREVIOUS_DEST_BACKUP'"
+            else
+                fn_log_warn "link-dest=$PREVIOUS_DEST_BACKUP not found! Please check backups in ${SSH_DEST_FOLDER_PREFIX}${DEST_FOLDER}/!"
+                if fn_log_info_ask "Skip creating a full backup: '%s'?" "$backup_date"; then
+                    continue
+                fi
+            fi
+        fi
+        # to ${backup_date}-inprogress/ first
+        backup_opts="$backup_opts -- '$SSH_SRC_FOLDER_PREFIX$SRC_FOLDER/$backup_date/' '$SSH_DEST_FOLDER_PREFIX$DEST_FOLDER/${backup_date}-inprogress/'"
+        fn_log_info "Running command:"
+        fn_log_info "  $CMD \ "
+        fn_log_info "    $backup_opts"
 
-    # Check if we ran out of space
-    local NO_SPACE_LEFT="$(grep "No space left on device (28)\|Result too large (34)" "$RSYNC_LOG_FILE")"
-    if [ -n "$NO_SPACE_LEFT" ]; then
-        fn_log_error "No space left on device: %s" "$DEST_FOLDER"
-        fn_log_error "Please switch to a device with enough space."
-        exit 5
+        if fn_run_cmd_src "test -d '$SRC_FOLDER/$backup_date'"; then  # recheck
+            eval "$CMD $backup_opts"
+            local CMD_RETURNCODE=$?
+        else
+            fn_log_error "Source backup not found: '$SSH_SRC_FOLDER_PREFIX$SRC_FOLDER/$backup_date'!"
+            fn_log_error "It seems that you may have deleted it while $APPNAME was running."
+            fn_log_error "Please restart $APPNAME in $BACKUP_MODE mode."
+            exit 5
+        fi
+
+        # Check if we ran out of space
+        local NO_SPACE_LEFT="$(grep "No space left on device (28)\|Result too large (34)" "$RSYNC_LOG_FILE")"
+        if [ -n "$NO_SPACE_LEFT" ]; then
+            fn_log_error "No space left on device: %s" "$DEST_FOLDER"
+            fn_log_error "Please switch to a device with enough space."
+            exit 5
+        fi
+
+        if fn_check_rsync_log $CMD_RETURNCODE "($backup_date)"; then
+            # mv inprogress directory: ${backup_date}-inprogress
+            fn_run_cmd "mv -- '$DEST_FOLDER/${backup_date}-inprogress/' '$DEST_FOLDER/${backup_date}'"
+            # Create the latest symlink only when rsync succeeded
+            fn_rm_file "$DEST_FOLDER/latest"
+            fn_ln "${backup_date}" "$DEST_FOLDER/latest"
+            # Remove duplicate.inprogress file only when rsync succeeded
+            fn_rm_file "$INPROGRESS_FILE"
+        else
+            fn_notify "critical" "${APPNAME^^} ${BACKUP_MODE} failed!" "$(basename "$DEST_FOLDER")"
+            exit 1
+        fi
+        echo
+    done
+
+    # other files in $SRC_FOLDER/
+    local ofiles=($(fn_run_cmd_src "find $SRC_FOLDER/ -maxdepth 1 -type f -not -name 'backup.marker' | sort"))
+    if [ "${#ofiles[@]}" -gt 0 ]; then
+        local baseofiles=()
+        local srcofiles=""
+        for i in ${ofiles[@]}; do
+            basefiles+=("$(basename "$i")")
+            srcofiles+="'$SSH_SRC_FOLDER_PREFIX$i' "
+        done
+        fn_log_info "Duplicate other files found in $SRC_FOLDER/"
+        fn_list 1 2 ${basefiles[@]}
+        fn_log_info "Running command:"
+        fn_log_info "  $CMD -- $srcofiles '$SSH_DEST_FOLDER_PREFIX$DEST_FOLDER/'"
+        eval "$CMD -- $srcofiles '$SSH_DEST_FOLDER_PREFIX$DEST_FOLDER/'"
+        if [ "$?" -ne 0 ]; then
+            fn_log_error "Rsync returned non-zero return code, backup other files failed."
+            fn_log_error "See more details in '$RSYNC_LOG_FILE'."
+        else
+             rm -f -- "$RSYNC_LOG_FILE"
+        fi
+        echo
     fi
 
-    # Remove duplicate.inprogress file only when rsync succeeded
-    if fn_check_rsync_log $CMD_RETURNCODE; then
-        fn_rm_file "$INPROGRESS_FILE"
-        fn_notify "normal" "${APPNAME^^} ${BACKUP_MODE} completed!" "$(basename "$DEST_FOLDER")"
-        exit
-    fi
-    fn_notify "critical" "${APPNAME^^} ${BACKUP_MODE} failed!" "$(basename "$DEST_FOLDER")"
-    exit 1
+    # ALL DONE
+    fn_log_info_hl "" "${BACKUP_MODE} '$(basename "$DEST_FOLDER")' completed!"
+    fn_notify "normal" "${APPNAME^^} ${BACKUP_MODE} completed!" "$(basename "$DEST_FOLDER")"
+    exit
 }
 
 # ---------------------------------------------------------------------------
@@ -1178,6 +1349,7 @@ elif [ "$ACTION" = "duplicate" ]; then
     # duplicate SRC_FOLDER -> DEST_FOLDER
     fn_check_SRC_DEST
     fn_check_show_duplicate_info
+    fn_compare_duplicate_backups
     # Setup additional variables
     INPROGRESS_FILE="$DEST_FOLDER/duplicate.inprogress"
     if [ -n "$(fn_find "$INPROGRESS_FILE")" ]; then
